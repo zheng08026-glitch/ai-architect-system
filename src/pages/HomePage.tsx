@@ -10,6 +10,7 @@ export default function HomePage() {
       <HeroSection />
       <SystemGrid />
       <PricingSection />
+{/* stable version */}
     </main>
   )
 }
