@@ -297,7 +297,7 @@ function FeaturePage({
                     }
 
                     const response = await fetch(
-                      "http://192.168.68.54:8000/submit",
+                      "http://192.168.68.54:5000/submit",
                       {
                         method: "POST",
                         body: formData
