@@ -21,6 +21,17 @@ function FeaturePage({
   showPromptInput = false,
   showCountSelect = false,
 }: FeaturePageProps) {
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+
+  const handleFile = (file: File) => {
+    setSelectedFile(file)
+
+    const url = URL.createObjectURL(file)
+
+    setPreviewUrl(url)
+  }
   return (
     <main className="min-h-screen bg-indigo-950 text-white">
       <div className="border-b border-indigo-800 px-6 py-4">
@@ -171,19 +182,61 @@ function FeaturePage({
                     {item}
                   </div>
 
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-dashed border-indigo-600 bg-indigo-950/30 transition hover:border-indigo-400 hover:bg-indigo-900/20">
-                    <div className="flex aspect-video items-center justify-center text-indigo-200/40">
-                      <div className="text-center">
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+
+                      const file = e.dataTransfer.files?.[0]
+
+                      if (file) {
+                        handleFile(file)
+                      }
+                    }}
+                    className="mt-4 flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-indigo-600 bg-indigo-950/30 transition hover:border-indigo-400 hover:bg-indigo-900/20"
+                  >
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+
+                        const file = e.target.files?.[0]
+
+                        if (file) {
+                          handleFile(file)
+                        }
+
+                      }}
+                    />
+
+                    {previewUrl ? (
+
+                      <img
+                        src={previewUrl}
+                        className="h-full w-full object-cover"
+                      />
+
+                    ) : (
+
+                      <div className="text-center text-indigo-200/40">
+
                         <div className="text-lg font-semibold">
                           Drag & Drop Image
                         </div>
 
-                        <div className="mt-2 text-sm text-indigo-200/40">
-                          Upload / Preview / Replace
+                        <div className="mt-2 text-sm">
+                          Click / Upload / Preview
                         </div>
+
                       </div>
-                    </div>
-                  </div>
+
+                    )}
+
+                  </label>
                 </div>
               ))}
 
@@ -233,6 +286,15 @@ function FeaturePage({
                       "count",
                       "1"
                     )
+
+                    if (selectedFile) {
+
+                      formData.append(
+                        "image",
+                        selectedFile
+                      )
+
+                    }
 
                     const response = await fetch(
                       "http://192.168.68.54:8000/submit",
