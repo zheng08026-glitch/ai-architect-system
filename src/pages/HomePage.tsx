@@ -1,6 +1,27 @@
+```tsx
 import { useState } from 'react'
 
-function FeaturePage({ title, subtitle, description, inputs, resultType, onBack, showPromptInput = false, showCountSelect = false }) {
+type FeaturePageProps = {
+  title: string
+  subtitle: string
+  description: string
+  inputs: string[]
+  resultType: string
+  onBack: () => void
+  showPromptInput?: boolean
+  showCountSelect?: boolean
+}
+
+function FeaturePage({
+  title,
+  subtitle,
+  description,
+  inputs,
+  resultType,
+  onBack,
+  showPromptInput = false,
+  showCountSelect = false,
+}: FeaturePageProps) {
   return (
     <main className="min-h-screen bg-indigo-950 text-white">
       <div className="border-b border-indigo-800 px-6 py-4">
@@ -325,7 +346,7 @@ function FeaturePage({ title, subtitle, description, inputs, resultType, onBack,
 
 export default function HomePage() {
   const [page, setPage] = useState('home')
-  const [theme, setTheme] = useState('blue')
+  const [theme, setTheme] = useState<'dark' | 'charcoal' | 'gray' | 'white' | 'blue'>('blue')
 
   const themes = {
     dark: {
