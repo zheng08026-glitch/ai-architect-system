@@ -279,7 +279,14 @@ function FeaturePage({
 
                     formData.append(
                       "workflow",
-                      JSON.stringify({})
+                      JSON.stringify({
+                        "6": {
+                          "inputs": {
+                            "text": "modern architecture"
+                          },
+                          "class_type": "CLIPTextEncode"
+                        }
+                      })
                     )
 
                     formData.append(
@@ -290,7 +297,7 @@ function FeaturePage({
                     if (selectedFile) {
 
                       formData.append(
-                        "image",
+                        "file",
                         selectedFile
                       )
 
