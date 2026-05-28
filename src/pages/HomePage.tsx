@@ -207,7 +207,61 @@ function FeaturePage({
                 </div>
               )}
 
-              <button className="w-full rounded-2xl bg-white py-4 text-lg font-semibold text-black transition hover:scale-[1.01]">
+              <button
+                onClick={async () => {
+
+                  try {
+
+                    const formData = new FormData()
+
+                    formData.append(
+                      "prompt",
+                      "modern architecture"
+                    )
+
+                    formData.append(
+                      "workflow_name",
+                      title
+                    )
+
+                    formData.append(
+                      "workflow",
+                      JSON.stringify({})
+                    )
+
+                    formData.append(
+                      "count",
+                      "1"
+                    )
+
+                    const response = await fetch(
+                      "http://192.168.68.54:8000/submit",
+                      {
+                        method: "POST",
+                        body: formData
+                      }
+                    )
+
+                    const data = await response.json()
+
+                    console.log(data)
+
+                    alert(
+                      "Job Submitted: " +
+                      data.job_id
+                    )
+
+                  } catch (error) {
+
+                    console.error(error)
+
+                    alert("API Connection Failed")
+
+                  }
+
+                }}
+                className="w-full rounded-2xl bg-white py-4 text-lg font-semibold text-black transition hover:scale-[1.01]"
+              >
                 Generate AI Result
               </button>
             </div>
