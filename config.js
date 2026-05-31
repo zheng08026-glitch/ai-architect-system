@@ -1,4 +1,3 @@
-// Production must use an HTTPS public API URL, for example:
-// window.ARCHITECT_AI_API_BASE = "https://api.your-domain.com";
-// Keep this empty until the Z83 Cloudflare Tunnel domain is ready.
-window.ARCHITECT_AI_API_BASE = "";
+// Temporary Cloudflare Tunnel API endpoint for UM760 dispatch.
+// This trycloudflare URL changes whenever the tunnel is restarted.
+window.ARCHITECT_AI_API_BASE = "https://psi-strengthening-uri-crown.trycloudflare.com";
