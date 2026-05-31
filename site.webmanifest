@@ -1,0 +1,10 @@
+{
+  "name": "ARCHITECT AI SYSTEM",
+  "short_name": "Architect AI",
+  "description": "AI 建築快速渲染平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050711",
+  "theme_color": "#050711",
+  "icons": []
+}

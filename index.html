@@ -1,13 +1,255 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ai-architect-system</title>
+    <title>ARCHITECT AI SYSTEM | AI 建築快速渲染平台</title>
+    <meta
+      name="description"
+      content="專為建築師、設計公司、建商與代銷打造的 AI 建築快速渲染平台。上傳量體、草圖、風格與基地照片，快速產出建築提案圖。"
+    />
+    <meta property="og:title" content="ARCHITECT AI SYSTEM" />
+    <meta property="og:description" content="AI 建築快速渲染平台封閉測試版。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./assets/hero-system.png" />
+    <meta name="theme-color" content="#050711" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div class="site-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="ARCHITECT AI SYSTEM home">
+          <span class="brand-mark">A</span>
+          <span>
+            <strong>ARCHITECT AI SYSTEM</strong>
+            <small>AI 建築快速渲染平台</small>
+          </span>
+        </a>
+
+        <nav class="desktop-nav" aria-label="主要導覽">
+          <a href="#systems">AI Systems</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#contact">Contact</a>
+        </nav>
+
+        <div class="top-actions">
+          <button class="ghost-button" type="button" data-open-auth>登入</button>
+        </div>
+      </header>
+
+      <main id="top">
+        <section class="hero">
+          <div class="palette-strip" aria-label="介面顏色模式">
+            <button class="swatch black" type="button" data-theme-option="black" aria-label="切換為黑色介面"></button>
+            <button class="swatch charcoal" type="button" data-theme-option="charcoal" aria-label="切換為深灰介面"></button>
+            <button class="swatch silver" type="button" data-theme-option="silver" aria-label="切換為淺灰介面"></button>
+            <button class="swatch white" type="button" data-theme-option="white" aria-label="切換為白色介面"></button>
+            <button class="swatch violet active" type="button" data-theme-option="violet" aria-label="切換為藍紫色介面" aria-pressed="true"></button>
+          </div>
+
+          <div class="architect-lines" aria-hidden="true"></div>
+
+          <div class="hero-copy">
+            <h1>ARCHITECT AI SYSTEM</h1>
+            <p class="eyebrow"><span></span> AI Architectural Visualization Platform</p>
+            <div class="hero-lead">
+              <p>AI協同作業 - 本平台在概念設計階段，快速產出多組外觀方案。</p>
+              <p>可控制的建築AI渲染圖 - 建築量體不更動，加入風格參考圖/提詞等。</p>
+              <p>專業建築師開發 - 本平台為開業建築師實務經驗，自行建構的AI建築視覺化系統。</p>
+            </div>
+          </div>
+
+          <div class="metrics" aria-label="平台重點">
+            <button class="metric-card" type="button" data-scroll-target="systems" aria-label="查看 A1-A9 生成系統架構">
+              <strong>9</strong>
+              <span>AI 生成系統</span>
+            </button>
+            <div>
+              <strong>1 / 6</strong>
+              <span>單張測試或多方案輸出</span>
+            </div>
+            <div>
+              <strong>2K</strong>
+              <span>高解析方案規劃</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="systems-section" id="systems">
+          <div class="section-heading">
+            <p class="eyebrow"><span></span> AI Systems</p>
+            <h2>A1-A9 生成系統架構</h2>
+            <p>從提示詞、草圖渲染、風格融合、基地整合到動畫輸出，依會員等級逐步開放。</p>
+          </div>
+          <div class="systems-grid" id="systemsGrid"></div>
+        </section>
+
+        <section class="workspace-section" id="workspace">
+          <div class="section-heading">
+            <p class="eyebrow"><span></span> Live Prototype</p>
+            <h2>AI 建築工作台</h2>
+            <p>
+              先選擇生成系統，再上傳對應素材。這裡展示首版平台介面，後續可串接會員、任務排程與專屬 AI 渲染引擎。
+            </p>
+          </div>
+
+          <div class="workspace-grid">
+            <aside class="system-list" id="systemList" aria-label="選擇 AI 生成系統"></aside>
+
+            <section class="tool-panel" aria-live="polite">
+              <div class="tool-header">
+                <div>
+                  <p class="panel-kicker" id="activeTier">Free</p>
+                  <h3 id="activeTitle">A1 Prompt Basic</h3>
+                  <p id="activeDesc">由建築量體圖判斷空間特徵，產生可延伸的英文建築提示詞。</p>
+                </div>
+                <span class="status-pill" id="activeStatus">Live System</span>
+              </div>
+
+              <div class="tool-body">
+                <form class="input-stack" id="inputStack"></form>
+
+                <div class="result-panel">
+                  <div class="result-toolbar">
+                    <div>
+                      <p class="panel-kicker">Result Preview</p>
+                      <h4 id="resultTitle">Prompt Result</h4>
+                    </div>
+                    <div class="result-actions">
+                      <button type="button" class="icon-button" id="copyResult" title="複製結果">Copy</button>
+                      <button type="button" class="icon-button" id="downloadResult" title="下載成果">Save</button>
+                    </div>
+                  </div>
+
+                  <div class="prompt-output" id="promptOutput">
+                    modern architectural facade, elegant residential tower, clean massing, controlled window rhythm, refined material contrast, realistic architectural visualization, soft daylight, professional proposal render
+                  </div>
+
+                  <div class="render-output hidden" id="renderOutput">
+                    <div class="main-preview" id="mainPreview">
+                      <span>AI Render Preview</span>
+                    </div>
+                    <div class="thumb-grid" id="thumbGrid"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="process-section" id="process">
+          <div class="section-heading">
+            <p class="eyebrow"><span></span> Practical Flow</p>
+            <h2>從法規量體到提案視覺</h2>
+          </div>
+
+          <div class="process-lanes">
+            <div class="lane">
+              <h3>傳統流程</h3>
+              <ol>
+                <li>法規檢討</li>
+                <li>初步量體模型</li>
+                <li>細緻建模與材質</li>
+                <li>打光、渲染、後製</li>
+              </ol>
+              <p>通常耗時數小時至數天，適合定案階段，但不利於早期多方案探索。</p>
+            </div>
+
+            <div class="lane accent">
+              <h3>AI 輔助流程</h3>
+              <ol>
+                <li>完成法規檢討與初步量體</li>
+                <li>上傳 Sketch / Style / Site</li>
+                <li>選擇張數與解析度</li>
+                <li>快速產出多組提案視覺</li>
+              </ol>
+              <p>讓概念階段更快進入可討論的視覺狀態，保留建築師對量體、比例與語彙的控制。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="pricing-section" id="pricing">
+          <div class="section-heading">
+            <p class="eyebrow"><span></span> Membership</p>
+            <h2>會員方案</h2>
+            <p>先以功能範圍與月用量定義產品價值，正式價格可在封閉測試後依 GPU 成本調整。</p>
+          </div>
+
+          <div class="pricing-grid">
+            <article class="price-card">
+              <h3>Free</h3>
+              <p>A1-A5 入門測試</p>
+              <strong>免費</strong>
+              <ul>
+                <li>每月各功能 3 次</li>
+                <li>每次輸出 1 張</li>
+                <li>適合試用與系統評估</li>
+              </ul>
+              <button type="button" data-open-auth>建立帳號</button>
+            </article>
+
+            <article class="price-card featured">
+              <h3>Plus</h3>
+              <p>A1-A7 完整提案工具</p>
+              <p class="badge">建議首發主力</p>
+              <strong>月費制</strong>
+              <ul>
+                <li>每月 60 張</li>
+                <li>開放基地整合與 2K 流程</li>
+                <li>適合建築師與設計工作室</li>
+              </ul>
+              <button type="button" data-open-auth>加入 Plus</button>
+            </article>
+
+            <article class="price-card">
+              <h3>Pro / Ultra</h3>
+              <p>商業大量生成與動畫</p>
+              <strong>洽談</strong>
+              <ul>
+                <li>A8 全控制模式</li>
+                <li>A9 建築動畫輸出</li>
+                <li>適合建商、代銷與大型團隊</li>
+              </ul>
+              <a href="#contact">聯絡我們</a>
+            </article>
+          </div>
+        </section>
+
+        <section class="contact-section" id="contact">
+          <div>
+            <p class="eyebrow"><span></span> Next Build</p>
+            <h2>後續可串接會員、任務排程與 AI 渲染節點</h2>
+            <p>
+              前端定稿後，下一步可接會員權限、點數扣除、任務排程、成果儲存與後台管理。
+            </p>
+          </div>
+          <a class="primary-button" href="mailto:hello@architect-ai.system">Contact</a>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="auth-dialog" id="authDialog">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="關閉">×</button>
+      </form>
+      <div>
+        <p class="eyebrow"><span></span> Member Access</p>
+        <h2>會員登入模組</h2>
+        <p>這裡預留給正式會員系統。之後可接 Email 登入、Google 登入、方案權限與用量紀錄。</p>
+        <label>
+          Email
+          <input type="email" placeholder="your@email.com" />
+        </label>
+        <label>
+          Password
+          <input type="password" placeholder="••••••••" />
+        </label>
+        <button class="primary-button full" type="button">登入 / 註冊</button>
+      </div>
+    </dialog>
+
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>
