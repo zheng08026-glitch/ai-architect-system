@@ -34,7 +34,7 @@
         </nav>
 
         <div class="top-actions">
-          <button class="ghost-button" type="button" data-open-auth>登入</button>
+          <button class="ghost-button" type="button" id="authButton" data-open-auth>登入</button>
         </div>
       </header>
 
@@ -235,17 +235,14 @@
       </form>
       <div>
         <p class="eyebrow"><span></span> Member Access</p>
-        <h2>會員登入模組</h2>
-        <p>這裡預留給正式會員系統。之後可接 Email 登入、Google 登入、方案權限與用量紀錄。</p>
+        <h2>會員登入</h2>
+        <p>A1/A2 可少量免登入試用；A3-A5 需登入會員後使用。</p>
         <label>
           Email
-          <input type="email" placeholder="your@email.com" />
+          <input id="authEmail" type="email" placeholder="your@email.com" />
         </label>
-        <label>
-          Password
-          <input type="password" placeholder="••••••••" />
-        </label>
-        <button class="primary-button full" type="button">登入 / 註冊</button>
+        <p class="auth-note" id="authMessage">目前為封測版 Email 登入，正式付款前不收費。</p>
+        <button class="primary-button full" id="authSubmit" type="button">登入 / 註冊</button>
       </div>
     </dialog>
 

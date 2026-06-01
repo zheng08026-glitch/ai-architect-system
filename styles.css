@@ -1293,6 +1293,13 @@ body[data-theme="white"] .badge::before {
   color: var(--muted);
 }
 
+.auth-note {
+  min-height: 22px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 @media (max-width: 1120px) {
   .hero,
   .workspace-grid,

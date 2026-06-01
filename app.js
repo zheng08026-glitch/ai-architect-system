@@ -145,6 +145,47 @@ const promptOutput = $("#promptOutput");
 const renderOutput = $("#renderOutput");
 const mainPreview = $("#mainPreview");
 const thumbGrid = $("#thumbGrid");
+const authButton = $("#authButton");
+const authEmail = $("#authEmail");
+const authSubmit = $("#authSubmit");
+const authMessage = $("#authMessage");
+const AUTH_TOKEN_KEY = "architect-ai-auth-token";
+const AUTH_EMAIL_KEY = "architect-ai-auth-email";
+const CLIENT_ID_KEY = "architect-ai-client-id";
+
+function getClientId() {
+  let clientId = localStorage.getItem(CLIENT_ID_KEY);
+  if (!clientId) {
+    clientId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    localStorage.setItem(CLIENT_ID_KEY, clientId);
+  }
+  return clientId;
+}
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+
+function getAuthEmail() {
+  return localStorage.getItem(AUTH_EMAIL_KEY) || "";
+}
+
+function updateAuthUi() {
+  const email = getAuthEmail();
+  if (authButton) authButton.textContent = email ? email : "登入";
+  if (authMessage) {
+    authMessage.textContent = email
+      ? `已登入：${email}`
+      : "目前為封測版 Email 登入，正式付款前不收費。";
+  }
+}
+
+function requiresMember(system) {
+  return ["A3", "A4", "A5"].includes(system.id);
+}
 
 function getActiveSystem() {
   return systems.find((system) => system.id === activeId) || systems[0];
@@ -353,6 +394,12 @@ function validateInputs(system) {
 }
 
 async function submitRealJob(system) {
+  if (requiresMember(system) && !getAuthToken()) {
+    authMessage.textContent = "請先登入會員後再使用 A3-A5。";
+    authDialog.showModal();
+    throw new Error("請先登入會員後再使用 A3-A5");
+  }
+
   const validationError = validateInputs(system);
   if (validationError) throw new Error(validationError);
 
@@ -360,6 +407,7 @@ async function submitRealJob(system) {
   formData.append("system_id", system.id);
   formData.append("prompt", $("#customPrompt")?.value || "");
   formData.append("count", ($("#outputCount")?.value || "1").trim().startsWith("6") ? "6" : "1");
+  formData.append("client_id", getClientId());
 
   system.inputs.forEach((input) => {
     const file = uploadedFiles.get(`${system.id}-${input.key}`);
@@ -367,8 +415,13 @@ async function submitRealJob(system) {
   });
 
   const apiBase = getApiBase();
+  const headers = {};
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const response = await fetch(`${apiBase}/api/jobs`, {
     method: "POST",
+    headers,
     body: formData,
   });
 
@@ -479,6 +532,53 @@ document.querySelectorAll("[data-open-auth]").forEach((button) => {
   button.addEventListener("click", () => authDialog.showModal());
 });
 
+async function loginWithEmail() {
+  const email = authEmail?.value.trim();
+  if (!email) {
+    authMessage.textContent = "請輸入 Email。";
+    return;
+  }
+
+  const apiBase = getApiBase();
+  if (!apiBase) {
+    authMessage.textContent = "尚未設定 API，無法登入。";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("email", email);
+  authSubmit.disabled = true;
+  authMessage.textContent = "登入中...";
+
+  try {
+    const response = await fetch(`${apiBase}/api/auth/login`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || "登入失敗");
+    }
+    const data = await response.json();
+    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    localStorage.setItem(AUTH_EMAIL_KEY, data.member?.email || email);
+    updateAuthUi();
+    authDialog.close();
+  } catch (error) {
+    authMessage.textContent = error.message || "登入失敗";
+  } finally {
+    authSubmit.disabled = false;
+  }
+}
+
+authSubmit?.addEventListener("click", loginWithEmail);
+authEmail?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    loginWithEmail();
+  }
+});
+
 const themeButtons = document.querySelectorAll("[data-theme-option]");
 
 function setTheme(theme) {
@@ -496,6 +596,7 @@ themeButtons.forEach((button) => {
 });
 
 setTheme(localStorage.getItem("architect-ai-theme") || "violet");
+updateAuthUi();
 
 document.querySelectorAll("[data-scroll-target]").forEach((button) => {
   button.addEventListener("click", () => {
