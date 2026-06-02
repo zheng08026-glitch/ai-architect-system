@@ -10,7 +10,7 @@
 
 - 前端網站：Cloudflare Pages 或其他靜態網站服務。
 - API 入口：Cloudflare Tunnel 指向 Z83 的 `http://localhost:5000`。
-- Z83：執行 `z83-dispatch`，負責任務、上傳檔、成果檔。
+- UM760：執行 `um760-dispatch`，負責任務、上傳檔、成果檔。
 - 5060 / 5070：執行各自 worker，向 Z83 領任務並回傳成果。
 
 ## 上架前必改
