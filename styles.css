@@ -1161,7 +1161,6 @@ body[data-theme="white"] .system-card p {
   color: var(--muted);
 }
 
-.process-lanes,
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1172,19 +1171,16 @@ body[data-theme="white"] .system-card p {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.lane,
 .price-card,
 .contact-section {
   padding: 26px;
 }
 
-.lane.accent,
 .price-card.featured {
   border-color: rgba(35, 242, 195, 0.42);
   background: linear-gradient(135deg, rgba(35, 242, 195, 0.12), var(--accent-soft));
 }
 
-.lane ol,
 .price-card ul {
   display: grid;
   gap: 10px;
@@ -1193,9 +1189,56 @@ body[data-theme="white"] .system-card p {
   color: var(--muted);
 }
 
-.lane p,
 .price-card p,
 .price-card li {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.process-table {
+  padding: 24px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.process-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.35fr;
+  gap: 18px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.process-row span:first-child {
+  color: var(--text);
+  font-weight: 760;
+}
+
+.process-head {
+  padding-top: 0;
+  color: var(--text);
+  font-weight: 780;
+}
+
+.process-head span {
+  color: var(--text);
+}
+
+.process-arrow {
+  padding: 2px 0 0;
+  color: var(--cyan);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.process-note {
+  max-width: 760px;
+  margin: 18px 0 0;
   color: var(--muted);
   line-height: 1.7;
 }
@@ -1361,9 +1404,13 @@ body[data-theme="white"] .badge::before {
   .metrics,
   .system-list,
   .systems-grid,
-  .process-lanes,
   .pricing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .process-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .hero-actions,

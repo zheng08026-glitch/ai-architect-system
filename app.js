@@ -278,8 +278,8 @@ function countField() {
   wrapper.innerHTML = `
     <label for="outputCount">輸出張數</label>
     <select id="outputCount">
-      <option>1 張 - 單張測試</option>
-      <option>6 張 - 多方案輸出</option>
+      <option>1 View - Quick Test</option>
+      <option>6 Views - Design Exploration</option>
     </select>
   `;
   return wrapper;
