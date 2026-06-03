@@ -250,22 +250,24 @@
       <div>
         <p class="eyebrow"><span></span> Member Access</p>
         <h2>會員登入</h2>
-        <p>A1/A2 可少量免登入試用；A3-A5 需完成會員登入後使用。</p>
-        <label>
-          Email
-          <input id="authEmail" type="email" placeholder="your@email.com" />
-        </label>
-        <label>
-          密碼
-          <input id="authPassword" type="password" placeholder="至少 8 個字元" />
-        </label>
-        <p class="auth-note" id="authMessage">註冊後系統會寄送 Email 驗證信，完成驗證後即可使用會員功能。</p>
-        <div class="auth-actions">
-          <button class="primary-button full" id="authSubmit" type="button">登入</button>
-          <button class="ghost-button full" id="authRegister" type="button">註冊</button>
+        <div class="auth-form-panel" id="authFormPanel">
+          <p>A1/A2 可少量免登入試用；A3-A5 需完成會員登入後使用。</p>
+          <label>
+            Email
+            <input id="authEmail" type="email" placeholder="your@email.com" />
+          </label>
+          <label>
+            密碼
+            <input id="authPassword" type="password" placeholder="至少 8 個字元" />
+          </label>
+          <p class="auth-note" id="authMessage">註冊後系統會寄送 Email 驗證信，完成驗證後即可使用會員功能。</p>
+          <div class="auth-actions">
+            <button class="primary-button full" id="authSubmit" type="button">登入</button>
+            <button class="ghost-button full" id="authRegister" type="button">註冊</button>
+          </div>
+          <button class="text-button" id="authReset" type="button">忘記密碼？寄送重設信</button>
+          <button class="ghost-button full" id="authGoogle" type="button">使用 Google 帳號登入</button>
         </div>
-        <button class="text-button" id="authReset" type="button">忘記密碼？寄送重設信</button>
-        <button class="ghost-button full" id="authGoogle" type="button">使用 Google 帳號登入</button>
         <div class="member-panel" id="memberPanel" hidden>
           <div class="member-panel-header">
             <div>

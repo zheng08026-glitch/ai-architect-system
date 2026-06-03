@@ -1506,6 +1506,10 @@ body[data-theme="white"] .badge::before {
   font-size: 0.92rem;
 }
 
+.auth-form-panel[hidden] {
+  display: none;
+}
+
 .member-panel {
   display: grid;
   gap: 16px;
@@ -1581,6 +1585,18 @@ body[data-theme="white"] .badge::before {
 
 .record-item small {
   color: var(--soft);
+}
+
+.record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.record-actions .text-button {
+  min-height: 26px;
+  margin-top: 0;
+  font-size: 0.88rem;
 }
 
 @media (max-width: 1120px) {

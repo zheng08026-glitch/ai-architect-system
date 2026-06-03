@@ -153,6 +153,7 @@ const authRegister = $("#authRegister");
 const authReset = $("#authReset");
 const authGoogle = $("#authGoogle");
 const authMessage = $("#authMessage");
+const authFormPanel = $("#authFormPanel");
 const authSignOut = $("#authSignOut");
 const memberPanel = $("#memberPanel");
 const memberSummary = $("#memberSummary");
@@ -170,6 +171,7 @@ const profileFields = {
 const AUTH_TOKEN_KEY = "architect-ai-auth-token";
 const AUTH_EMAIL_KEY = "architect-ai-auth-email";
 const CLIENT_ID_KEY = "architect-ai-client-id";
+let memberJobs = [];
 
 function getSupabaseConfig() {
   return {
@@ -214,12 +216,32 @@ function getAuthEmail() {
   return localStorage.getItem(AUTH_EMAIL_KEY) || "";
 }
 
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char];
+  });
+}
+
+function formatJobTime(value) {
+  if (!value) return "";
+  const date = typeof value === "number" ? new Date(value * 1000) : new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-TW");
+}
+
 function getAuthHeaders() {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function setMemberCenterVisible(isVisible) {
+  if (authFormPanel) authFormPanel.hidden = isVisible;
   if (memberPanel) memberPanel.hidden = !isVisible;
 }
 
@@ -262,20 +284,37 @@ function renderUsageList(records = []) {
 
 function renderJobList(records = []) {
   if (!jobList) return;
+  memberJobs = records;
   if (!records.length) {
     jobList.innerHTML = "<span>尚無任務紀錄。</span>";
     return;
   }
   jobList.innerHTML = records
     .slice(0, 8)
-    .map(
-      (job) => `
-        <div class="record-item">
-          <strong>${job.system_id || "AI"} · ${job.status || "pending"}</strong>
-          <small>${job.created_at || job.updated_at || job.job_id || ""}</small>
+    .map((job, index) => {
+      const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
+      const hasResult = job.status === "completed" && (imageUrls.length || job.output_text);
+      const downloadUrl = imageUrls[0] || "";
+      return `
+        <div class="record-item" data-job-index="${index}">
+          <strong>${escapeHtml(job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
+          <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}</small>
+          ${job.error ? `<small>${escapeHtml(job.error)}</small>` : ""}
+          <div class="record-actions">
+            ${
+              hasResult
+                ? `<button type="button" class="text-button" data-open-job="${index}">查看成果</button>`
+                : ""
+            }
+            ${
+              downloadUrl
+                ? `<a class="text-button" href="${escapeHtml(downloadUrl)}" download target="_blank" rel="noreferrer">下載</a>`
+                : ""
+            }
+          </div>
         </div>
-      `,
-    )
+      `;
+    })
     .join("");
 }
 
@@ -312,7 +351,7 @@ async function loadMemberCenter() {
 
 function updateAuthUi() {
   const email = getAuthEmail();
-  if (authButton) authButton.textContent = email ? email : "登入";
+  if (authButton) authButton.textContent = email ? "會員中心" : "登入";
   setMemberCenterVisible(Boolean(email));
   if (authMessage) {
     authMessage.textContent = email
@@ -513,6 +552,24 @@ function setImageResults(imageUrls) {
     });
     thumbGrid.append(button);
   });
+}
+
+function openJobResult(index) {
+  const job = memberJobs[index];
+  if (!job) return;
+  const system = systems.find((item) => item.id === job.system_id) || getActiveSystem();
+  activeId = system.id;
+  renderApp();
+
+  if (system.result === "prompt") {
+    promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
+  } else {
+    const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
+    setImageResults(imageUrls);
+  }
+
+  document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+  authDialog.close();
 }
 
 async function pollJob(jobId, system) {
@@ -809,6 +866,7 @@ async function signOut() {
   renderUsageList([]);
   renderJobList([]);
   updateAuthUi();
+  if (authMessage) authMessage.textContent = "已登出，A3-A5 需重新登入後使用。";
 }
 
 async function saveProfile(event) {
@@ -847,6 +905,11 @@ authReset?.addEventListener("click", resetPassword);
 authGoogle?.addEventListener("click", loginWithGoogle);
 authSignOut?.addEventListener("click", signOut);
 profileForm?.addEventListener("submit", saveProfile);
+jobList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-job]");
+  if (!button) return;
+  openJobResult(Number(button.dataset.openJob));
+});
 authEmail?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
