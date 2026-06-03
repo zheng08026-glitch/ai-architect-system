@@ -147,11 +147,52 @@ const mainPreview = $("#mainPreview");
 const thumbGrid = $("#thumbGrid");
 const authButton = $("#authButton");
 const authEmail = $("#authEmail");
+const authPassword = $("#authPassword");
 const authSubmit = $("#authSubmit");
+const authRegister = $("#authRegister");
+const authReset = $("#authReset");
+const authGoogle = $("#authGoogle");
 const authMessage = $("#authMessage");
+const authSignOut = $("#authSignOut");
+const memberPanel = $("#memberPanel");
+const memberSummary = $("#memberSummary");
+const profileForm = $("#profileForm");
+const usageList = $("#usageList");
+const jobList = $("#jobList");
+const profileFields = {
+  name: $("#profileName"),
+  company: $("#profileCompany"),
+  phone: $("#profilePhone"),
+  tax_id: $("#profileTaxId"),
+  invoice_title: $("#profileInvoiceTitle"),
+  profession: $("#profileProfession"),
+};
 const AUTH_TOKEN_KEY = "architect-ai-auth-token";
 const AUTH_EMAIL_KEY = "architect-ai-auth-email";
 const CLIENT_ID_KEY = "architect-ai-client-id";
+
+function getSupabaseConfig() {
+  return {
+    url: (window.ARCHITECT_AI_SUPABASE_URL || "").trim(),
+    key: (window.ARCHITECT_AI_SUPABASE_ANON_KEY || "").trim(),
+  };
+}
+
+function hasSupabaseConfig() {
+  const config = getSupabaseConfig();
+  return Boolean(config.url && config.key && window.supabase?.createClient);
+}
+
+let supabaseClient = null;
+
+function getSupabaseClient() {
+  if (!hasSupabaseConfig()) return null;
+  if (!supabaseClient) {
+    const config = getSupabaseConfig();
+    supabaseClient = window.supabase.createClient(config.url, config.key);
+  }
+  return supabaseClient;
+}
 
 function getClientId() {
   let clientId = localStorage.getItem(CLIENT_ID_KEY);
@@ -173,14 +214,129 @@ function getAuthEmail() {
   return localStorage.getItem(AUTH_EMAIL_KEY) || "";
 }
 
+function getAuthHeaders() {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function setMemberCenterVisible(isVisible) {
+  if (memberPanel) memberPanel.hidden = !isVisible;
+}
+
+function renderProfile(profile = {}) {
+  Object.entries(profileFields).forEach(([key, field]) => {
+    if (field) field.value = profile[key] || "";
+  });
+}
+
+function renderMemberSummary(profileData = {}, usageData = {}) {
+  if (!memberSummary) return;
+  const plan = profileData.plan || "free";
+  const email = profileData.email || getAuthEmail();
+  const usageCount = Array.isArray(usageData.usage) ? usageData.usage.length : 0;
+  memberSummary.innerHTML = `
+    <span>${email || "會員"}</span>
+    <span>${plan.toUpperCase()}</span>
+    <span>${usageCount ? `目前有 ${usageCount} 筆用量紀錄` : "尚無用量紀錄"}</span>
+  `;
+}
+
+function renderUsageList(records = []) {
+  if (!usageList) return;
+  if (!records.length) {
+    usageList.innerHTML = "<span>尚無用量紀錄。</span>";
+    return;
+  }
+  usageList.innerHTML = records
+    .slice(0, 8)
+    .map(
+      (record) => `
+        <div class="record-item">
+          <strong>${record.system_id || "AI System"} · ${record.count || 0} 次</strong>
+          <small>${record.period || ""}</small>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function renderJobList(records = []) {
+  if (!jobList) return;
+  if (!records.length) {
+    jobList.innerHTML = "<span>尚無任務紀錄。</span>";
+    return;
+  }
+  jobList.innerHTML = records
+    .slice(0, 8)
+    .map(
+      (job) => `
+        <div class="record-item">
+          <strong>${job.system_id || "AI"} · ${job.status || "pending"}</strong>
+          <small>${job.created_at || job.updated_at || job.job_id || ""}</small>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+async function fetchMemberJson(path) {
+  const apiBase = getApiBase();
+  const token = getAuthToken();
+  if (!apiBase || !token) return null;
+  const response = await fetch(`${apiBase}${path}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error("無法取得會員資料");
+  return response.json();
+}
+
+async function loadMemberCenter() {
+  const email = getAuthEmail();
+  setMemberCenterVisible(Boolean(email));
+  if (!email || !getApiBase()) return;
+
+  try {
+    const [profileData, usageData, jobsData] = await Promise.all([
+      fetchMemberJson("/api/member/profile"),
+      fetchMemberJson("/api/member/usage"),
+      fetchMemberJson("/api/member/jobs"),
+    ]);
+    renderProfile(profileData?.profile || {});
+    renderMemberSummary(profileData || {}, usageData || {});
+    renderUsageList(usageData?.usage || []);
+    renderJobList(jobsData?.jobs || []);
+  } catch (error) {
+    if (authMessage) authMessage.textContent = `${error.message}，請稍後再試。`;
+  }
+}
+
 function updateAuthUi() {
   const email = getAuthEmail();
   if (authButton) authButton.textContent = email ? email : "登入";
+  setMemberCenterVisible(Boolean(email));
   if (authMessage) {
     authMessage.textContent = email
       ? `已登入：${email}`
-      : "目前為封測版 Email 登入，正式付款前不收費。";
+      : hasSupabaseConfig()
+        ? "請使用 Email 註冊或登入；註冊後需完成信箱驗證。"
+        : "尚未設定 Supabase，會員驗證功能尚未啟用。";
   }
+}
+
+async function refreshAuthSession() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  const { data } = await client.auth.getSession();
+  const session = data?.session;
+  if (session?.access_token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
+    localStorage.setItem(AUTH_EMAIL_KEY, session.user?.email || "");
+  } else {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_EMAIL_KEY);
+  }
+  updateAuthUi();
+  await loadMemberCenter();
 }
 
 function requiresMember(system) {
@@ -439,6 +595,7 @@ async function submitRealJob(system) {
   }
 
   await pollJob(data.job_id, system);
+  await loadMemberCenter();
 }
 
 async function submitOrSimulateGenerate() {
@@ -534,35 +691,33 @@ document.querySelectorAll("[data-open-auth]").forEach((button) => {
 
 async function loginWithEmail() {
   const email = authEmail?.value.trim();
+  const password = authPassword?.value || "";
   if (!email) {
     authMessage.textContent = "請輸入 Email。";
     return;
   }
 
-  const apiBase = getApiBase();
-  if (!apiBase) {
-    authMessage.textContent = "尚未設定 API，無法登入。";
+  if (!password) {
+    authMessage.textContent = "請輸入密碼。";
     return;
   }
 
-  const formData = new FormData();
-  formData.append("email", email);
+  const client = getSupabaseClient();
+  if (!client) {
+    authMessage.textContent = "尚未設定 Supabase，無法使用正式會員登入。";
+    return;
+  }
+
   authSubmit.disabled = true;
   authMessage.textContent = "登入中...";
 
   try {
-    const response = await fetch(`${apiBase}/api/auth/login`, {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || "登入失敗");
-    }
-    const data = await response.json();
-    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    localStorage.setItem(AUTH_EMAIL_KEY, data.member?.email || email);
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    localStorage.setItem(AUTH_TOKEN_KEY, data.session.access_token);
+    localStorage.setItem(AUTH_EMAIL_KEY, data.user?.email || email);
     updateAuthUi();
+    await loadMemberCenter();
     authDialog.close();
   } catch (error) {
     authMessage.textContent = error.message || "登入失敗";
@@ -571,8 +726,134 @@ async function loginWithEmail() {
   }
 }
 
+async function registerWithEmail() {
+  const email = authEmail?.value.trim();
+  const password = authPassword?.value || "";
+  if (!email) {
+    authMessage.textContent = "請輸入 Email。";
+    return;
+  }
+  if (password.length < 8) {
+    authMessage.textContent = "密碼至少需要 8 個字元。";
+    return;
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    authMessage.textContent = "尚未設定 Supabase，無法註冊正式會員。";
+    return;
+  }
+
+  authRegister.disabled = true;
+  authMessage.textContent = "註冊中...";
+
+  try {
+    const { error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    if (error) throw error;
+    authMessage.textContent = "註冊成功，請到信箱收驗證信。完成驗證後再登入。";
+  } catch (error) {
+    authMessage.textContent = error.message || "註冊失敗";
+  } finally {
+    authRegister.disabled = false;
+  }
+}
+
+async function resetPassword() {
+  const email = authEmail?.value.trim();
+  if (!email) {
+    authMessage.textContent = "請先輸入 Email。";
+    return;
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    authMessage.textContent = "尚未設定 Supabase，無法寄送重設密碼信。";
+    return;
+  }
+
+  authMessage.textContent = "寄送重設密碼信...";
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+  authMessage.textContent = error ? error.message : "已寄送重設密碼信，請檢查信箱。";
+}
+
+async function loginWithGoogle() {
+  const client = getSupabaseClient();
+  if (!client) {
+    authMessage.textContent = "尚未設定 Supabase，無法使用 Google 登入。";
+    return;
+  }
+
+  const { error } = await client.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+  if (error) authMessage.textContent = error.message;
+}
+
+async function signOut() {
+  const client = getSupabaseClient();
+  if (client) await client.auth.signOut();
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_EMAIL_KEY);
+  renderProfile({});
+  renderUsageList([]);
+  renderJobList([]);
+  updateAuthUi();
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const apiBase = getApiBase();
+  const token = getAuthToken();
+  if (!apiBase || !token) {
+    authMessage.textContent = "請先登入會員後再儲存資料。";
+    return;
+  }
+
+  const payload = Object.fromEntries(
+    Object.entries(profileFields).map(([key, field]) => [key, field?.value || ""]),
+  );
+
+  try {
+    const response = await fetch(`${apiBase}/api/member/profile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("會員資料儲存失敗");
+    authMessage.textContent = "會員資料已儲存。";
+    await loadMemberCenter();
+  } catch (error) {
+    authMessage.textContent = error.message || "會員資料儲存失敗";
+  }
+}
+
 authSubmit?.addEventListener("click", loginWithEmail);
+authRegister?.addEventListener("click", registerWithEmail);
+authReset?.addEventListener("click", resetPassword);
+authGoogle?.addEventListener("click", loginWithGoogle);
+authSignOut?.addEventListener("click", signOut);
+profileForm?.addEventListener("submit", saveProfile);
 authEmail?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    loginWithEmail();
+  }
+});
+authPassword?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
     loginWithEmail();
@@ -597,6 +878,18 @@ themeButtons.forEach((button) => {
 
 setTheme(localStorage.getItem("architect-ai-theme") || "violet");
 updateAuthUi();
+refreshAuthSession();
+getSupabaseClient()?.auth.onAuthStateChange(async (_event, session) => {
+  if (session?.access_token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
+    localStorage.setItem(AUTH_EMAIL_KEY, session.user?.email || "");
+  } else {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_EMAIL_KEY);
+  }
+  updateAuthUi();
+  await loadMemberCenter();
+});
 
 document.querySelectorAll("[data-scroll-target]").forEach((button) => {
   button.addEventListener("click", () => {

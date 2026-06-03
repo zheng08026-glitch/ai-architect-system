@@ -250,16 +250,82 @@
       <div>
         <p class="eyebrow"><span></span> Member Access</p>
         <h2>會員登入</h2>
-        <p>A1/A2 可少量免登入試用；A3-A5 需登入會員後使用。</p>
+        <p>A1/A2 可少量免登入試用；A3-A5 需完成會員登入後使用。</p>
         <label>
           Email
           <input id="authEmail" type="email" placeholder="your@email.com" />
         </label>
-        <p class="auth-note" id="authMessage">目前為封測版 Email 登入，正式付款前不收費。</p>
-        <button class="primary-button full" id="authSubmit" type="button">登入 / 註冊</button>
+        <label>
+          密碼
+          <input id="authPassword" type="password" placeholder="至少 8 個字元" />
+        </label>
+        <p class="auth-note" id="authMessage">註冊後系統會寄送 Email 驗證信，完成驗證後即可使用會員功能。</p>
+        <div class="auth-actions">
+          <button class="primary-button full" id="authSubmit" type="button">登入</button>
+          <button class="ghost-button full" id="authRegister" type="button">註冊</button>
+        </div>
+        <button class="text-button" id="authReset" type="button">忘記密碼？寄送重設信</button>
+        <button class="ghost-button full" id="authGoogle" type="button">使用 Google 帳號登入</button>
+        <div class="member-panel" id="memberPanel" hidden>
+          <div class="member-panel-header">
+            <div>
+              <p class="panel-kicker">Member Center</p>
+              <h3>會員中心</h3>
+            </div>
+            <button class="text-button" id="authSignOut" type="button">登出</button>
+          </div>
+
+          <div class="member-summary" id="memberSummary">
+            <span>登入後可查看方案、用量與任務紀錄。</span>
+          </div>
+
+          <form class="profile-form" id="profileForm">
+            <label>
+              姓名
+              <input id="profileName" name="name" type="text" autocomplete="name" />
+            </label>
+            <label>
+              公司 / 事務所
+              <input id="profileCompany" name="company" type="text" autocomplete="organization" />
+            </label>
+            <label>
+              電話
+              <input id="profilePhone" name="phone" type="tel" autocomplete="tel" />
+            </label>
+            <label>
+              統一編號
+              <input id="profileTaxId" name="tax_id" type="text" inputmode="numeric" />
+            </label>
+            <label>
+              發票抬頭
+              <input id="profileInvoiceTitle" name="invoice_title" type="text" />
+            </label>
+            <label>
+              身分 / 職務
+              <input id="profileProfession" name="profession" type="text" placeholder="建築師、設計師、學生..." />
+            </label>
+            <button class="primary-button full" id="profileSave" type="submit">儲存會員資料</button>
+          </form>
+
+          <div class="member-records">
+            <section>
+              <h4>使用紀錄</h4>
+              <div class="record-list" id="usageList">
+                <span>尚無用量紀錄。</span>
+              </div>
+            </section>
+            <section>
+              <h4>近期任務</h4>
+              <div class="record-list" id="jobList">
+                <span>尚無任務紀錄。</span>
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
     </dialog>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js"></script>
     <script src="./app.js"></script>
   </body>
