@@ -255,26 +255,39 @@ function renderMemberSummary(profileData = {}, usageData = {}) {
   if (!memberSummary) return;
   const plan = profileData.plan || "free";
   const email = profileData.email || getAuthEmail();
-  const usageCount = Array.isArray(usageData.usage) ? usageData.usage.length : 0;
+  const records = Array.isArray(usageData.usage) ? usageData.usage : [];
+  const promptRecord = records.find((record) => record.bucket === "member_prompt_daily") || {};
+  const imageRecord = records.find((record) => record.bucket === "member_image_monthly") || {};
+  const promptUsed = Number(promptRecord.used || 0);
+  const promptLimit = Number(promptRecord.limit || 10);
+  const imageUsed = Number(imageRecord.used || 0);
+  const imageLimit = Number(imageRecord.limit || 30);
   memberSummary.innerHTML = `
     <span>${email || "會員"}</span>
     <span>${plan.toUpperCase()}</span>
-    <span>${usageCount ? `目前有 ${usageCount} 筆用量紀錄` : "尚無用量紀錄"}</span>
+    <span>A1/A2 今日 ${promptUsed}/${promptLimit}</span>
+    <span>A3-A5 本月 ${imageUsed}/${imageLimit}</span>
   `;
 }
 
 function renderUsageList(records = []) {
   if (!usageList) return;
   if (!records.length) {
-    usageList.innerHTML = "<span>尚無用量紀錄。</span>";
+    usageList.innerHTML = "<span>尚無用量紀錄。A1/A2 今日可試用，A3-A5 會依會員額度扣次。</span>";
     return;
   }
+  const bucketLabels = {
+    member_prompt_daily: "A1/A2 今日提示詞額度",
+    member_image_monthly: "A3-A5 本月生成額度",
+    anon_prompt_daily: "匿名今日試用額度",
+  };
   usageList.innerHTML = records
     .slice(0, 8)
     .map(
       (record) => `
         <div class="record-item">
-          <strong>${record.system_id || "AI System"} · ${record.count || 0} 次</strong>
+          <strong>${bucketLabels[record.bucket] || record.bucket || "使用額度"}</strong>
+          <small>${record.used || 0}/${record.limit || 0}，剩餘 ${record.remaining ?? Math.max(0, (record.limit || 0) - (record.used || 0))}</small>
           <small>${record.period || ""}</small>
         </div>
       `,
