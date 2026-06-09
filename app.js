@@ -268,31 +268,31 @@ function renderMemberSummary(profileData = {}, usageData = {}) {
   const plan = profileData.plan || "free";
   const email = profileData.email || getAuthEmail();
   const records = Array.isArray(usageData.usage) ? usageData.usage : [];
-  const promptRecord = records.find((record) => record.bucket === "member_prompt_daily") || {};
-  const imageRecord = records.find((record) => record.bucket === "member_image_monthly") || {};
-  const promptUsed = Number(promptRecord.used || 0);
-  const promptLimit = Number(promptRecord.limit || 10);
-  const imageUsed = Number(imageRecord.used || 0);
-  const imageLimit = Number(imageRecord.limit || 30);
+  const a1A8Record = records.find((record) => record.bucket === "member_a1_a8_monthly") || {};
+  const a9Record = records.find((record) => record.bucket === "member_a9_monthly") || {};
+  const a1A8Used = Number(a1A8Record.used || 0);
+  const a1A8Limit = Number(a1A8Record.limit || 15);
+  const a9Used = Number(a9Record.used || 0);
+  const a9Limit = Number(a9Record.limit || 3);
   memberSummary.innerHTML = `
     <span>${email || "會員"}</span>
     <span>${plan.toUpperCase()}</span>
     ${hasAdminAccess(profileData) ? `<span>${profileData.is_primary_admin ? "PRIMARY ADMIN" : "ADMIN"}</span>` : ""}
-    <span>A1/A2 今日 ${promptUsed}/${promptLimit}</span>
-    <span>A3-A5 本月 ${imageUsed}/${imageLimit}</span>
+    <span>A1-A8 本月 ${a1A8Used}/${a1A8Limit}</span>
+    <span>A9 本月 ${a9Used}/${a9Limit}</span>
   `;
 }
 
 function renderUsageList(records = []) {
   if (!usageList) return;
   if (!records.length) {
-    usageList.innerHTML = "<span>尚無用量紀錄。A1/A2 今日可試用，A3-A5 會依會員額度扣次。</span>";
+    usageList.innerHTML = "<span>尚無用量紀錄。註冊會員每月 A1-A8 共用 15 次，A9 可用 3 次。</span>";
     return;
   }
   const bucketLabels = {
-    member_prompt_daily: "A1/A2 今日提示詞額度",
-    member_image_monthly: "A3-A5 本月生成額度",
-    anon_prompt_daily: "匿名今日試用額度",
+    member_a1_a8_monthly: "A1-A8 本月共用額度",
+    member_a9_monthly: "A9 本月額度",
+    anon_a1_a2_daily: "匿名 A1/A2 今日試用額度",
   };
   usageList.innerHTML = records
     .slice(0, 8)
@@ -388,12 +388,12 @@ function renderAdminOverview(data = {}) {
   const members = data.members || {};
   const jobs = data.jobs || {};
   const usage = data.usage || {};
-  const imageUsage = usage.member_image_monthly || {};
+  const promotionalUsage = usage.member_a1_a8_monthly || {};
   adminOverview.innerHTML = `
     <div class="admin-stat"><span>Total members</span><strong>${members.total || 0}</strong></div>
     <div class="admin-stat"><span>Active</span><strong>${members.by_status?.active || 0}</strong></div>
     <div class="admin-stat"><span>Completed jobs</span><strong>${jobs.completed || 0}</strong></div>
-    <div class="admin-stat"><span>Image usage</span><strong>${imageUsage.used || 0}</strong></div>
+    <div class="admin-stat"><span>A1-A8 usage</span><strong>${promotionalUsage.used || 0}</strong></div>
     <div class="admin-stat admin-stat-wide"><span>Primary admin</span><strong>${escapeHtml(members.primary_admin_email || "not set")}</strong></div>
   `;
 }
@@ -406,8 +406,8 @@ function renderAdminMembers(records = []) {
   }
   adminMemberList.innerHTML = records
     .map((member) => {
-      const prompts = member.current_usage?.prompts || {};
-      const images = member.current_usage?.images || {};
+      const a1A8 = member.current_usage?.a1_a8 || {};
+      const a9 = member.current_usage?.a9 || {};
       const jobs = member.job_summary || {};
       const lastActivity = formatJobTime(jobs.last_activity_at) || "No activity";
       return `
@@ -416,8 +416,8 @@ function renderAdminMembers(records = []) {
             <strong>${escapeHtml(member.email)}${member.is_primary_admin ? ' <span class="tier-chip">Primary</span>' : ""}</strong>
             <small>${escapeHtml(member.role || "member")} | last login ${escapeHtml(formatJobTime(member.last_login_at) || "never")}</small>
             <div class="admin-usage-summary">
-              <span><strong>${Number(prompts.remaining || 0)}</strong> prompts left today</span>
-              <span><strong>${Number(images.remaining || 0)}</strong> images left this month</span>
+              <span><strong>${Number(a1A8.remaining || 0)}</strong> A1-A8 left this month</span>
+              <span><strong>${Number(a9.remaining || 0)}</strong> A9 left this month</span>
               <span><strong>${Number(jobs.completed || 0)}</strong> completed / ${Number(jobs.failed || 0)} failed</span>
               <span>Last activity: ${escapeHtml(lastActivity)}</span>
             </div>
@@ -449,8 +449,7 @@ function renderAdminMembers(records = []) {
           <div class="admin-member-actions">
             <button class="text-button" type="button" data-admin-action="details">Details</button>
             <button class="text-button" type="button" data-admin-action="save">Save</button>
-            <button class="text-button" type="button" data-admin-action="grant-image">+10 images</button>
-            <button class="text-button" type="button" data-admin-action="grant-prompt">+10 prompts</button>
+            <button class="text-button" type="button" data-admin-action="grant-package">Open +50 / +5</button>
           </div>
         </div>
       `;
@@ -471,15 +470,15 @@ function renderAdminMemberDetail(data = {}) {
   const jobs = Array.isArray(data.jobs) ? data.jobs : [];
   const credits = Array.isArray(data.credits) ? data.credits : [];
   const currentUsage = data.current_usage || {};
-  const promptUsage = currentUsage.prompts || {};
-  const imageUsage = currentUsage.images || {};
+  const a1A8Usage = currentUsage.a1_a8 || {};
+  const a9Usage = currentUsage.a9 || {};
   const jobSummary = data.job_summary || {};
 
   adminDetailTitle.textContent = member.email || "Member";
   adminDetailContent.innerHTML = `
     <div class="admin-detail-summary">
-      <div><span>Prompts remaining today</span><strong>${Number(promptUsage.remaining || 0)}</strong><small>${Number(promptUsage.used || 0)}/${Number(promptUsage.limit || 0)} used</small></div>
-      <div><span>Images remaining this month</span><strong>${Number(imageUsage.remaining || 0)}</strong><small>${Number(imageUsage.used || 0)}/${Number(imageUsage.limit || 0)} used</small></div>
+      <div><span>A1-A8 remaining this month</span><strong>${Number(a1A8Usage.remaining || 0)}</strong><small>${Number(a1A8Usage.used || 0)}/${Number(a1A8Usage.limit || 0)} used</small></div>
+      <div><span>A9 remaining this month</span><strong>${Number(a9Usage.remaining || 0)}</strong><small>${Number(a9Usage.used || 0)}/${Number(a9Usage.limit || 0)} used</small></div>
       <div><span>Total jobs</span><strong>${Number(jobSummary.total || 0)}</strong><small>${Number(jobSummary.completed || 0)} completed / ${Number(jobSummary.failed || 0)} failed</small></div>
       <div><span>Last activity</span><strong>${detailValue(formatJobTime(jobSummary.last_activity_at))}</strong></div>
     </div>
@@ -610,14 +609,11 @@ async function handleAdminMemberAction(event) {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
-    } else {
-      const isPrompt = action === "grant-prompt";
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
+    } else if (action === "grant-package") {
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant-package`, {
         method: "POST",
         body: JSON.stringify({
-          bucket: isPrompt ? "member_prompt_daily" : "member_image_monthly",
-          amount: 10,
-          reason: isPrompt ? "admin prompt grant" : "admin image grant",
+          reason: "Promotional access opened by admin",
         }),
       });
     }
@@ -684,7 +680,7 @@ async function refreshAuthSession() {
 }
 
 function requiresMember(system) {
-  return ["A3", "A4", "A5"].includes(system.id);
+  return !["A1", "A2"].includes(system.id);
 }
 
 function getActiveSystem() {
@@ -877,6 +873,47 @@ function openJobResult(index) {
   authDialog.close();
 }
 
+function renderJobProgress(system, job = {}) {
+  const percent = Math.max(1, Math.min(Number(job.progress_percent || 8), 99));
+  const activeStage = job.stage || "analyzing";
+  const stageOrder = ["analyzing", "encoding", "generating"];
+  const activeIndex = Math.max(0, stageOrder.indexOf(activeStage));
+  const stages = [
+    ["analyzing", "分析使用者提供資訊"],
+    ["encoding", "影像編碼中"],
+    ["generating", "影像生成中"],
+  ];
+  const markup = `
+    <div class="job-progress">
+      <div class="job-progress-header">
+        <strong>${escapeHtml(job.stage_label || "分析使用者提供資訊")}</strong>
+        <span>預估 ${percent}%</span>
+      </div>
+      <div class="job-progress-track" aria-label="預估作業進度">
+        <span style="width: ${percent}%"></span>
+      </div>
+      <ol class="job-progress-stages">
+        ${stages
+          .map(
+            ([key, label], index) => `
+              <li class="${index < activeIndex ? "done" : index === activeIndex ? "active" : ""}">
+                <span>${index + 1}</span>${label}
+              </li>
+            `,
+          )
+          .join("")}
+      </ol>
+      <small>通常約 2-6 分鐘，繁忙或複雜任務可能更久。百分比為預估，完成後會自動顯示成果。</small>
+    </div>
+  `;
+  if (system.result === "prompt") {
+    promptOutput.innerHTML = markup;
+  } else {
+    mainPreview.innerHTML = markup;
+    thumbGrid.innerHTML = "";
+  }
+}
+
 async function pollJob(jobId, system) {
   const apiBase = getApiBase();
   for (let attempt = 0; attempt < 900; attempt += 1) {
@@ -897,6 +934,7 @@ async function pollJob(jobId, system) {
       throw new Error(job.error || "任務失敗");
     }
 
+    renderJobProgress(system, job);
     await new Promise((resolve) => window.setTimeout(resolve, 2000));
   }
 
@@ -913,9 +951,9 @@ function validateInputs(system) {
 
 async function submitRealJob(system) {
   if (requiresMember(system) && !getAuthToken()) {
-    authMessage.textContent = "請先登入會員後再使用 A3-A5。";
+    authMessage.textContent = "請先登入會員後再使用 A3-A9。";
     authDialog.showModal();
-    throw new Error("請先登入會員後再使用 A3-A5");
+    throw new Error("請先登入會員後再使用 A3-A9");
   }
 
   const validationError = validateInputs(system);
@@ -949,12 +987,11 @@ async function submitRealJob(system) {
   }
 
   const data = await response.json();
-  if (system.result === "prompt") {
-    promptOutput.textContent = "任務已送出，正在產生提示詞...";
-  } else {
-    mainPreview.innerHTML = "<span>任務已送出，正在產生建築圖...</span>";
-    thumbGrid.innerHTML = "";
-  }
+  renderJobProgress(system, {
+    stage: "analyzing",
+    stage_label: "分析使用者提供資訊",
+    progress_percent: 8,
+  });
 
   await pollJob(data.job_id, system);
   await loadMemberCenter();
@@ -1173,7 +1210,7 @@ async function signOut() {
   renderUsageList([]);
   renderJobList([]);
   updateAuthUi();
-  if (authMessage) authMessage.textContent = "已登出，A3-A5 需重新登入後使用。";
+  if (authMessage) authMessage.textContent = "已登出，A3-A9 需重新登入後使用。";
 }
 
 async function saveProfile(event) {
