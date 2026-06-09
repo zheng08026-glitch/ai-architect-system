@@ -34,6 +34,7 @@
         </nav>
 
         <div class="top-actions">
+          <button class="ghost-button" type="button" id="adminButton" hidden>Admin</button>
           <button class="ghost-button" type="button" id="authButton" data-open-auth>登入</button>
         </div>
       </header>
@@ -273,7 +274,10 @@
               <p class="panel-kicker">Member Center</p>
               <h3>會員中心</h3>
             </div>
-            <button class="text-button" id="authSignOut" type="button">登出</button>
+            <div class="member-panel-actions">
+              <button class="text-button" id="memberAdminButton" type="button" hidden>Admin</button>
+              <button class="text-button" id="authSignOut" type="button">登出</button>
+            </div>
           </div>
 
           <div class="member-summary" id="memberSummary">
@@ -322,6 +326,29 @@
               </div>
             </section>
           </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="auth-dialog admin-dialog" id="adminDialog">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Close">?</button>
+      </form>
+      <div>
+        <p class="eyebrow"><span></span> Admin Console</p>
+        <h2>Member Operations</h2>
+        <p class="auth-note" id="adminMessage">Manage members, usage grants, plans, and account status.</p>
+
+        <div class="admin-overview" id="adminOverview">
+          <span>Loading overview...</span>
+        </div>
+
+        <div class="admin-toolbar">
+          <button class="primary-button compact" type="button" id="adminRefresh">Refresh</button>
+        </div>
+
+        <div class="admin-member-list" id="adminMemberList">
+          <span>Loading members...</span>
         </div>
       </div>
     </dialog>

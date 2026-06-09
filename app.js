@@ -146,6 +146,13 @@ const renderOutput = $("#renderOutput");
 const mainPreview = $("#mainPreview");
 const thumbGrid = $("#thumbGrid");
 const authButton = $("#authButton");
+const adminButton = $("#adminButton");
+const memberAdminButton = $("#memberAdminButton");
+const adminDialog = $("#adminDialog");
+const adminMessage = $("#adminMessage");
+const adminOverview = $("#adminOverview");
+const adminMemberList = $("#adminMemberList");
+const adminRefresh = $("#adminRefresh");
 const authEmail = $("#authEmail");
 const authPassword = $("#authPassword");
 const authSubmit = $("#authSubmit");
@@ -172,6 +179,7 @@ const AUTH_TOKEN_KEY = "architect-ai-auth-token";
 const AUTH_EMAIL_KEY = "architect-ai-auth-email";
 const CLIENT_ID_KEY = "architect-ai-client-id";
 let memberJobs = [];
+let currentMember = null;
 
 function getSupabaseConfig() {
   return {
@@ -265,6 +273,7 @@ function renderMemberSummary(profileData = {}, usageData = {}) {
   memberSummary.innerHTML = `
     <span>${email || "會員"}</span>
     <span>${plan.toUpperCase()}</span>
+    ${hasAdminAccess(profileData) ? `<span>${profileData.is_primary_admin ? "PRIMARY ADMIN" : "ADMIN"}</span>` : ""}
     <span>A1/A2 今日 ${promptUsed}/${promptLimit}</span>
     <span>A3-A5 本月 ${imageUsed}/${imageLimit}</span>
   `;
@@ -342,9 +351,159 @@ async function fetchMemberJson(path) {
   return response.json();
 }
 
+async function fetchAdminJson(path, options = {}) {
+  const apiBase = getApiBase();
+  const token = getAuthToken();
+  if (!apiBase || !token) throw new Error("Admin API requires sign in.");
+  const response = await fetch(`${apiBase}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Admin request failed.");
+  }
+  return response.json();
+}
+
+function setAdminVisible(isVisible) {
+  if (adminButton) adminButton.hidden = !isVisible;
+  if (memberAdminButton) memberAdminButton.hidden = !isVisible;
+}
+
+function hasAdminAccess(profileData = {}) {
+  return profileData?.role === "admin" || profileData?.is_primary_admin === true;
+}
+
+function renderAdminOverview(data = {}) {
+  if (!adminOverview) return;
+  const members = data.members || {};
+  const jobs = data.jobs || {};
+  const usage = data.usage || {};
+  const imageUsage = usage.member_image_monthly || {};
+  adminOverview.innerHTML = `
+    <div class="admin-stat"><span>Total members</span><strong>${members.total || 0}</strong></div>
+    <div class="admin-stat"><span>Active</span><strong>${members.by_status?.active || 0}</strong></div>
+    <div class="admin-stat"><span>Completed jobs</span><strong>${jobs.completed || 0}</strong></div>
+    <div class="admin-stat"><span>Image usage</span><strong>${imageUsage.used || 0}</strong></div>
+    <div class="admin-stat admin-stat-wide"><span>Primary admin</span><strong>${escapeHtml(members.primary_admin_email || "not set")}</strong></div>
+  `;
+}
+
+function renderAdminMembers(records = []) {
+  if (!adminMemberList) return;
+  if (!records.length) {
+    adminMemberList.innerHTML = "<span>No members yet.</span>";
+    return;
+  }
+  adminMemberList.innerHTML = records
+    .map(
+      (member) => `
+        <div class="admin-member-card" data-admin-email="${escapeHtml(member.email)}">
+          <div>
+            <strong>${escapeHtml(member.email)}${member.is_primary_admin ? ' <span class="tier-chip">Primary</span>' : ""}</strong>
+            <small>${escapeHtml(member.role || "member")} | last login ${escapeHtml(formatJobTime(member.last_login_at) || "never")}</small>
+          </div>
+          <label>
+            Role
+            <select data-admin-field="role" ${member.is_primary_admin ? "disabled" : ""}>
+              ${["member", "admin"]
+                .map((role) => `<option value="${role}" ${member.role === role ? "selected" : ""}>${role}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <label>
+            Plan
+            <select data-admin-field="plan">
+              ${["free", "plus", "pro", "ultra", "enterprise"]
+                .map((plan) => `<option value="${plan}" ${member.plan === plan ? "selected" : ""}>${plan}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <label>
+            Status
+            <select data-admin-field="status">
+              ${["active", "trialing", "suspended", "banned", "deleted"]
+                .map((status) => `<option value="${status}" ${member.status === status ? "selected" : ""}>${status}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <div class="admin-member-actions">
+            <button class="text-button" type="button" data-admin-action="save">Save</button>
+            <button class="text-button" type="button" data-admin-action="grant-image">+10 images</button>
+            <button class="text-button" type="button" data-admin-action="grant-prompt">+10 prompts</button>
+          </div>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+async function loadAdminDashboard() {
+  if (!adminMessage) return;
+  adminMessage.textContent = "Loading admin data...";
+  try {
+    const [overview, members] = await Promise.all([
+      fetchAdminJson("/api/admin/overview"),
+      fetchAdminJson("/api/admin/members"),
+    ]);
+    renderAdminOverview(overview);
+    renderAdminMembers(members.members || []);
+    adminMessage.textContent = "Admin data loaded.";
+  } catch (error) {
+    adminMessage.textContent = error.message || "Admin data failed to load.";
+  }
+}
+
+async function handleAdminMemberAction(event) {
+  const button = event.target.closest("[data-admin-action]");
+  if (!button) return;
+  const card = button.closest("[data-admin-email]");
+  if (!card) return;
+  const email = card.dataset.adminEmail;
+  const action = button.dataset.adminAction;
+  button.disabled = true;
+  if (adminMessage) adminMessage.textContent = "Saving admin change...";
+
+  try {
+    if (action === "save") {
+      const payload = {
+        role: card.querySelector('[data-admin-field="role"]')?.value,
+        plan: card.querySelector('[data-admin-field="plan"]')?.value,
+        status: card.querySelector('[data-admin-field="status"]')?.value,
+      };
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      const isPrompt = action === "grant-prompt";
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
+        method: "POST",
+        body: JSON.stringify({
+          bucket: isPrompt ? "member_prompt_daily" : "member_image_monthly",
+          amount: 10,
+          reason: isPrompt ? "admin prompt grant" : "admin image grant",
+        }),
+      });
+    }
+    await loadAdminDashboard();
+  } catch (error) {
+    if (adminMessage) adminMessage.textContent = error.message || "Admin change failed.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function loadMemberCenter() {
   const email = getAuthEmail();
   setMemberCenterVisible(Boolean(email));
+  setAdminVisible(false);
+  currentMember = null;
   if (!email || !getApiBase()) return;
 
   try {
@@ -353,6 +512,8 @@ async function loadMemberCenter() {
       fetchMemberJson("/api/member/usage"),
       fetchMemberJson("/api/member/jobs"),
     ]);
+    currentMember = profileData || null;
+    setAdminVisible(hasAdminAccess(profileData));
     renderProfile(profileData?.profile || {});
     renderMemberSummary(profileData || {}, usageData || {});
     renderUsageList(usageData?.usage || []);
@@ -365,6 +526,7 @@ async function loadMemberCenter() {
 function updateAuthUi() {
   const email = getAuthEmail();
   if (authButton) authButton.textContent = email ? "會員中心" : "登入";
+  if (!email) setAdminVisible(false);
   setMemberCenterVisible(Boolean(email));
   if (authMessage) {
     authMessage.textContent = email
@@ -875,6 +1037,8 @@ async function signOut() {
   if (client) await client.auth.signOut();
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_EMAIL_KEY);
+  currentMember = null;
+  setAdminVisible(false);
   renderProfile({});
   renderUsageList([]);
   renderJobList([]);
@@ -917,6 +1081,15 @@ authRegister?.addEventListener("click", registerWithEmail);
 authReset?.addEventListener("click", resetPassword);
 authGoogle?.addEventListener("click", loginWithGoogle);
 authSignOut?.addEventListener("click", signOut);
+async function openAdminDialog() {
+  adminDialog?.showModal();
+  await loadAdminDashboard();
+}
+
+adminButton?.addEventListener("click", openAdminDialog);
+memberAdminButton?.addEventListener("click", openAdminDialog);
+adminRefresh?.addEventListener("click", loadAdminDashboard);
+adminMemberList?.addEventListener("click", handleAdminMemberAction);
 profileForm?.addEventListener("submit", saveProfile);
 jobList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-job]");
