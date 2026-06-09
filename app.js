@@ -153,6 +153,10 @@ const adminMessage = $("#adminMessage");
 const adminOverview = $("#adminOverview");
 const adminMemberList = $("#adminMemberList");
 const adminRefresh = $("#adminRefresh");
+const adminDetail = $("#adminDetail");
+const adminDetailTitle = $("#adminDetailTitle");
+const adminDetailContent = $("#adminDetailContent");
+const adminDetailClose = $("#adminDetailClose");
 const authEmail = $("#authEmail");
 const authPassword = $("#authPassword");
 const authSubmit = $("#authSubmit");
@@ -401,12 +405,22 @@ function renderAdminMembers(records = []) {
     return;
   }
   adminMemberList.innerHTML = records
-    .map(
-      (member) => `
+    .map((member) => {
+      const prompts = member.current_usage?.prompts || {};
+      const images = member.current_usage?.images || {};
+      const jobs = member.job_summary || {};
+      const lastActivity = formatJobTime(jobs.last_activity_at) || "No activity";
+      return `
         <div class="admin-member-card" data-admin-email="${escapeHtml(member.email)}">
-          <div>
+          <div class="admin-member-identity">
             <strong>${escapeHtml(member.email)}${member.is_primary_admin ? ' <span class="tier-chip">Primary</span>' : ""}</strong>
             <small>${escapeHtml(member.role || "member")} | last login ${escapeHtml(formatJobTime(member.last_login_at) || "never")}</small>
+            <div class="admin-usage-summary">
+              <span><strong>${Number(prompts.remaining || 0)}</strong> prompts left today</span>
+              <span><strong>${Number(images.remaining || 0)}</strong> images left this month</span>
+              <span><strong>${Number(jobs.completed || 0)}</strong> completed / ${Number(jobs.failed || 0)} failed</span>
+              <span>Last activity: ${escapeHtml(lastActivity)}</span>
+            </div>
           </div>
           <label>
             Role
@@ -433,19 +447,133 @@ function renderAdminMembers(records = []) {
             </select>
           </label>
           <div class="admin-member-actions">
+            <button class="text-button" type="button" data-admin-action="details">Details</button>
             <button class="text-button" type="button" data-admin-action="save">Save</button>
             <button class="text-button" type="button" data-admin-action="grant-image">+10 images</button>
             <button class="text-button" type="button" data-admin-action="grant-prompt">+10 prompts</button>
           </div>
         </div>
-      `,
-    )
+      `;
+    })
     .join("");
+}
+
+function detailValue(value) {
+  const text = String(value || "").trim();
+  return escapeHtml(text || "Not provided");
+}
+
+function renderAdminMemberDetail(data = {}) {
+  if (!adminDetail || !adminDetailContent || !adminDetailTitle) return;
+  const member = data.member || {};
+  const profile = member.profile || {};
+  const usage = Array.isArray(data.usage) ? data.usage : [];
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const credits = Array.isArray(data.credits) ? data.credits : [];
+  const currentUsage = data.current_usage || {};
+  const promptUsage = currentUsage.prompts || {};
+  const imageUsage = currentUsage.images || {};
+  const jobSummary = data.job_summary || {};
+
+  adminDetailTitle.textContent = member.email || "Member";
+  adminDetailContent.innerHTML = `
+    <div class="admin-detail-summary">
+      <div><span>Prompts remaining today</span><strong>${Number(promptUsage.remaining || 0)}</strong><small>${Number(promptUsage.used || 0)}/${Number(promptUsage.limit || 0)} used</small></div>
+      <div><span>Images remaining this month</span><strong>${Number(imageUsage.remaining || 0)}</strong><small>${Number(imageUsage.used || 0)}/${Number(imageUsage.limit || 0)} used</small></div>
+      <div><span>Total jobs</span><strong>${Number(jobSummary.total || 0)}</strong><small>${Number(jobSummary.completed || 0)} completed / ${Number(jobSummary.failed || 0)} failed</small></div>
+      <div><span>Last activity</span><strong>${detailValue(formatJobTime(jobSummary.last_activity_at))}</strong></div>
+    </div>
+    <div class="admin-detail-grid">
+      <div><span>Name</span><strong>${detailValue(profile.name)}</strong></div>
+      <div><span>Company / Studio</span><strong>${detailValue(profile.company)}</strong></div>
+      <div><span>Phone</span><strong>${detailValue(profile.phone)}</strong></div>
+      <div><span>Tax ID</span><strong>${detailValue(profile.tax_id)}</strong></div>
+      <div><span>Invoice title</span><strong>${detailValue(profile.invoice_title)}</strong></div>
+      <div><span>Profession / Role</span><strong>${detailValue(profile.profession)}</strong></div>
+      <div><span>Registered</span><strong>${detailValue(formatJobTime(member.created_at))}</strong></div>
+      <div><span>Last login</span><strong>${detailValue(formatJobTime(member.last_login_at))}</strong></div>
+      <div><span>Plan</span><strong>${detailValue(member.plan)}</strong></div>
+      <div><span>Status</span><strong>${detailValue(member.status)}</strong></div>
+    </div>
+    <div class="admin-detail-sections">
+      <section>
+        <h4>Usage</h4>
+        <div class="record-list">
+          ${
+            usage.length
+              ? usage
+                  .slice(0, 12)
+                  .map(
+                    (record) => `
+                      <div class="record-item">
+                        <strong>${detailValue(record.bucket)}</strong>
+                        <small>${Number(record.used || 0)}/${Number(record.limit || 0)} | ${detailValue(record.period)}</small>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : "<span>No usage records.</span>"
+          }
+        </div>
+      </section>
+      <section>
+        <h4>Recent jobs</h4>
+        <div class="record-list">
+          ${
+            jobs.length
+              ? jobs
+                  .slice(0, 12)
+                  .map(
+                    (job) => `
+                      <div class="record-item">
+                        <strong>${detailValue(job.system_id)} | ${detailValue(job.status)}</strong>
+                        <small>${detailValue(formatJobTime(job.completed_at || job.failed_at || job.created_at))}</small>
+                        ${job.error ? `<small>${detailValue(job.error)}</small>` : ""}
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : "<span>No job records.</span>"
+          }
+        </div>
+      </section>
+      <section>
+        <h4>Credits and grants</h4>
+        <div class="record-list">
+          ${
+            credits.length
+              ? credits
+                  .slice(0, 12)
+                  .map(
+                    (entry) => `
+                      <div class="record-item">
+                        <strong>+${Number(entry.amount || 0)} ${detailValue(entry.bucket)}</strong>
+                        <small>${detailValue(entry.reason)} | ${detailValue(formatJobTime(entry.created_at))}</small>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : "<span>No credit records.</span>"
+          }
+        </div>
+      </section>
+    </div>
+  `;
+  adminDetail.hidden = false;
+  adminDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function loadAdminMemberDetail(email) {
+  if (adminMessage) adminMessage.textContent = `Loading ${email}...`;
+  const data = await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}`);
+  renderAdminMemberDetail(data);
+  if (adminMessage) adminMessage.textContent = "Member detail loaded.";
 }
 
 async function loadAdminDashboard() {
   if (!adminMessage) return;
   adminMessage.textContent = "Loading admin data...";
+  if (adminDetail) adminDetail.hidden = true;
   try {
     const [overview, members] = await Promise.all([
       fetchAdminJson("/api/admin/overview"),
@@ -470,7 +598,9 @@ async function handleAdminMemberAction(event) {
   if (adminMessage) adminMessage.textContent = "Saving admin change...";
 
   try {
-    if (action === "save") {
+    if (action === "details") {
+      await loadAdminMemberDetail(email);
+    } else if (action === "save") {
       const payload = {
         role: card.querySelector('[data-admin-field="role"]')?.value,
         plan: card.querySelector('[data-admin-field="plan"]')?.value,
@@ -491,7 +621,7 @@ async function handleAdminMemberAction(event) {
         }),
       });
     }
-    await loadAdminDashboard();
+    if (action !== "details") await loadAdminDashboard();
   } catch (error) {
     if (adminMessage) adminMessage.textContent = error.message || "Admin change failed.";
   } finally {
@@ -1090,6 +1220,9 @@ adminButton?.addEventListener("click", openAdminDialog);
 memberAdminButton?.addEventListener("click", openAdminDialog);
 adminRefresh?.addEventListener("click", loadAdminDashboard);
 adminMemberList?.addEventListener("click", handleAdminMemberAction);
+adminDetailClose?.addEventListener("click", () => {
+  if (adminDetail) adminDetail.hidden = true;
+});
 profileForm?.addEventListener("submit", saveProfile);
 jobList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-job]");
