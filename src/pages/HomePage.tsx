@@ -567,8 +567,8 @@ export default function HomePage() {
     },
     {
       id: 'A6',
-      title: 'Style Sketch 2K',
-      subtitle: '風格圖 + Sketch + 2K',
+      title: 'Style Sketch HD',
+      subtitle: '風格圖 + Sketch + HD',
       description: '高解析建築渲染輸出',
       resultType: 'image',
       inputs: ['Sketch Upload', 'Style Image Upload'],
@@ -577,8 +577,8 @@ export default function HomePage() {
     },
     {
       id: 'A7',
-      title: 'Style Sketch Site 2K',
-      subtitle: '風格圖 + Sketch + Site + 2K',
+      title: 'Style Sketch Site HD',
+      subtitle: '風格圖 + Sketch + Site + HD',
       description: '基地整合高解析建築渲染',
       resultType: 'image',
       inputs: ['Sketch Upload', 'Style Image Upload', 'Site Image Upload'],
@@ -754,4 +754,3 @@ export default function HomePage() {
     </main>
   )
 }
-

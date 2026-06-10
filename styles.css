@@ -916,6 +916,13 @@ section {
   object-fit: cover;
 }
 
+.main-preview video {
+  width: 100%;
+  height: 100%;
+  max-height: 520px;
+  object-fit: contain;
+}
+
 textarea,
 select,
 input {
@@ -931,6 +938,34 @@ textarea {
   min-height: 116px;
   padding: 12px;
   resize: vertical;
+}
+
+.prompt-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.prompt-presets > span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.prompt-presets button {
+  min-height: 38px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 750;
+}
+
+.prompt-presets button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 select,
@@ -1003,6 +1038,66 @@ input {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.image-compare {
+  --compare-position: 50%;
+  position: relative;
+  width: 100%;
+  min-height: 340px;
+  overflow: hidden;
+}
+
+.image-compare > img,
+.image-compare-after,
+.image-compare-after img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-compare-after {
+  clip-path: inset(0 0 0 var(--compare-position));
+}
+
+.image-compare-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--compare-position);
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.65);
+  transform: translateX(-1px);
+}
+
+.image-compare-label {
+  position: absolute;
+  top: 12px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(5, 7, 17, 0.78);
+  color: #fff;
+  font-size: 12px;
+}
+
+.image-compare-label.before {
+  left: 12px;
+}
+
+.image-compare-label.after {
+  right: 12px;
+}
+
+.image-compare input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: ew-resize;
+  opacity: 0;
 }
 
 .job-progress {

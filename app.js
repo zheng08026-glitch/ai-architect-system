@@ -68,11 +68,11 @@ const systems = [
   },
   {
     id: "A6",
-    title: "Style Sketch 2K",
-    subtitle: "風格圖 + Sketch + 2K",
+    title: "Style Sketch HD",
+    subtitle: "風格圖 + Sketch + HD",
     desc: "針對需要簡報與提案輸出的情境，產出高解析建築渲染。",
     tier: "Plus",
-    status: "Under Construction",
+    status: "Live System",
     result: "image",
     inputs: [
       { key: "sketch", label: "Sketch / 3D 量體圖" },
@@ -83,11 +83,11 @@ const systems = [
   },
   {
     id: "A7",
-    title: "Style Sketch Site 2K",
-    subtitle: "風格圖 + Sketch + Site + 2K",
+    title: "Style Sketch Site HD",
+    subtitle: "風格圖 + Sketch + Site + HD",
     desc: "將風格、量體與基地整合後輸出高解析提案圖。",
     tier: "Plus",
-    status: "Under Construction",
+    status: "Live System",
     result: "image",
     inputs: [
       { key: "sketch", label: "Sketch / 3D 量體圖" },
@@ -98,21 +98,30 @@ const systems = [
     prompt: false,
   },
   {
-    id: "A8",
-    title: "Full Control Mode",
-    subtitle: "提詞 + Sketch + Site + 2K",
-    desc: "提供更高控制度的商業生成模式，適合專案正式提案與團隊使用。",
+    id: "A8-1",
+    gridDisplayId: "A8",
+    title: "HD Enhance",
+    subtitle: "建築圖片快速高畫質放大",
+    desc: "使用 RealESRGAN 快速放大建築渲染圖，適合一般提案與高解析輸出。",
     tier: "Pro",
-    status: "Planned",
+    status: "Live System",
     result: "image",
-    inputs: [
-      { key: "sketch", label: "Sketch / 3D 量體圖" },
-      { key: "style", label: "風格參考圖" },
-      { key: "site", label: "基地與周邊環境圖" },
-      { key: "depth", label: "控制參考圖" },
-    ],
-    count: true,
-    prompt: true,
+    inputs: [{ key: "building", label: "待增強建築圖片" }],
+    count: false,
+    prompt: false,
+  },
+  {
+    id: "A8-2",
+    activeTitle: "A8-2 Rerender",
+    title: "Rerender",
+    subtitle: "AI自動判斷重繪",
+    desc: "使用 AI 自動判斷重新強化材質、紋理與建築細節，亦適合模糊圖片轉為高品質。",
+    tier: "Pro",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "building", label: "待重繪建築圖片" }],
+    count: false,
+    prompt: false,
   },
   {
     id: "A9",
@@ -120,10 +129,10 @@ const systems = [
     subtitle: "AI 建築動畫輸出",
     desc: "將建築透視圖轉為鏡頭動畫，服務建商、代銷與簡報需求。",
     tier: "Pro",
-    status: "Planned",
-    result: "image",
-    inputs: [{ key: "render", label: "建築透視圖 / Render" }],
-    count: true,
+    status: "Live System",
+    result: "video",
+    inputs: [{ key: "building", label: "建築透視圖 / Render" }],
+    count: false,
     prompt: true,
   },
 ];
@@ -319,7 +328,9 @@ function renderJobList(records = []) {
     .slice(0, 8)
     .map((job, index) => {
       const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
-      const hasResult = job.status === "completed" && (imageUrls.length || job.output_text);
+      const videoUrls = job.output_videos || (job.output_video ? [job.output_video] : []);
+      const hasResult =
+        job.status === "completed" && (imageUrls.length || videoUrls.length || job.output_text);
       const downloadUrl = imageUrls[0] || "";
       return `
         <div class="record-item" data-job-index="${index}">
@@ -693,7 +704,7 @@ function systemButton(system) {
   button.className = `system-button ${system.id === activeId ? "active" : ""}`;
   button.disabled = system.status !== "Live System";
   button.innerHTML = `
-    <span class="system-id">${system.id}</span>
+    <span class="system-id">${system.displayId || system.id}</span>
     <span><strong>${system.title}</strong><small>${system.subtitle}</small></span>
     <span class="tier-chip">${system.tier}</span>
   `;
@@ -713,7 +724,7 @@ function systemCard(system) {
   card.disabled = system.status !== "Live System";
   card.innerHTML = `
     <div class="system-card-top">
-      <span class="system-id">${system.id}</span>
+      <span class="system-id">${system.gridDisplayId || system.displayId || system.id}</span>
       <span class="status-pill ${system.status === "Live System" ? "with-dot" : "pending"}">${system.status}</span>
     </div>
     <h3>${system.title}</h3>
@@ -758,13 +769,38 @@ function uploadField(input) {
   return wrapper;
 }
 
-function textPromptField() {
+const A9_HORIZONTAL_PROMPT =
+  "(Camera moving from left to right:1.5), shooting clockwise around a horizontal plane. A cinematic aerial drone captures a sunset over a  building. The view sweeps steadily to the right, revealing the right side of the building structure. The background blurs as the camera circles in a clockwise arc. Golden hour lighting, high-speed motion blur on surroundings, building remains sharp and centered. Architectural consistency, stable geometry, 4k, professional advertising style.";
+
+function textPromptField(system) {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
+  const isA9 = system.id === "A9";
   wrapper.innerHTML = `
-    <label for="customPrompt">建築提示詞</label>
-    <textarea id="customPrompt" placeholder="例如：低樓層集合住宅、清水混凝土、深窗框、街角基地、柔和日光..."></textarea>
+    <label for="customPrompt">${isA9 ? "影像提示詞" : "建築提示詞"}</label>
+    <textarea id="customPrompt" placeholder="${
+      isA9
+        ? "描述鏡頭方向、運動方式、光線與動畫氛圍..."
+        : "例如：低樓層集合住宅、清水混凝土、深窗框、街角基地、柔和日光..."
+    }"></textarea>
+    ${
+      isA9
+        ? `
+          <div class="prompt-presets" aria-label="推薦提示詞">
+            <span>推薦提示詞</span>
+            <button type="button" data-prompt-preset="horizontal">1. 水平移動</button>
+            <button type="button" disabled>2. 待更新</button>
+            <button type="button" disabled>3. 待更新</button>
+            <button type="button" disabled>4. 待更新</button>
+            <button type="button" disabled>5. 待更新</button>
+          </div>
+        `
+        : ""
+    }
   `;
+  wrapper.querySelector('[data-prompt-preset="horizontal"]')?.addEventListener("click", () => {
+    wrapper.querySelector("#customPrompt").value = A9_HORIZONTAL_PROMPT;
+  });
   return wrapper;
 }
 
@@ -784,7 +820,7 @@ function countField() {
 function renderInputs(system) {
   inputStack.innerHTML = "";
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
-  if (system.prompt) inputStack.append(textPromptField());
+  if (system.prompt) inputStack.append(textPromptField(system));
   if (system.count) inputStack.append(countField());
 
   const generateButton = document.createElement("button");
@@ -797,7 +833,11 @@ function renderInputs(system) {
 
 function renderResult(system) {
   const isPrompt = system.result === "prompt";
-  resultTitle.textContent = isPrompt ? "提示詞結果" : "建築圖結果";
+  resultTitle.textContent = isPrompt
+    ? "提示詞結果"
+    : system.id === "A9"
+      ? "AI演算影像結果"
+      : "建築圖結果";
   promptOutput.classList.toggle("hidden", !isPrompt);
   renderOutput.classList.toggle("hidden", isPrompt);
 
@@ -813,6 +853,8 @@ function renderResult(system) {
     : "<span>上傳圖片後可先確認預覽，送出後會顯示生成成果。</span>";
 
   thumbGrid.innerHTML = "";
+  if (!system.count) return;
+
   for (let index = 0; index < 6; index += 1) {
     const button = document.createElement("button");
     button.type = "button";
@@ -836,6 +878,32 @@ function fieldNameForInput(input) {
   return input.key;
 }
 
+function getOriginalPreview(system) {
+  return system.inputs
+    .map((input) => previews.get(`${system.id}-${input.key}`))
+    .find(Boolean);
+}
+
+function setComparisonResult(originalUrl, resultUrl) {
+  mainPreview.innerHTML = `
+    <div class="image-compare">
+      <img src="${originalUrl}" alt="處理前圖片" />
+      <div class="image-compare-after">
+        <img src="${resultUrl}" alt="處理後圖片" />
+      </div>
+      <div class="image-compare-line" aria-hidden="true"></div>
+      <span class="image-compare-label before">處理前</span>
+      <span class="image-compare-label after">處理後</span>
+      <input type="range" min="0" max="100" value="50" aria-label="拖曳比較處理前後圖片" />
+    </div>
+  `;
+  const comparison = mainPreview.querySelector(".image-compare");
+  comparison.querySelector("input").addEventListener("input", (event) => {
+    comparison.style.setProperty("--compare-position", `${event.target.value}%`);
+  });
+  thumbGrid.innerHTML = "";
+}
+
 function setImageResults(imageUrls) {
   if (!imageUrls.length) {
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
@@ -855,6 +923,36 @@ function setImageResults(imageUrls) {
   });
 }
 
+function setVideoResults(videoUrls) {
+  if (!videoUrls.length) {
+    mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
+    thumbGrid.innerHTML = "";
+    return;
+  }
+
+  mainPreview.innerHTML = `
+    <video controls playsinline preload="metadata">
+      <source src="${videoUrls[0]}" />
+      您的瀏覽器無法播放此影片。
+    </video>
+  `;
+  thumbGrid.innerHTML = "";
+}
+
+function setJobResults(system, job) {
+  if (system.result === "video") {
+    setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []));
+    return;
+  }
+  const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
+  const originalUrl = getOriginalPreview(system);
+  if (["A8-1", "A8-2"].includes(system.id) && originalUrl && imageUrls[0]) {
+    setComparisonResult(originalUrl, imageUrls[0]);
+    return;
+  }
+  setImageResults(imageUrls);
+}
+
 function openJobResult(index) {
   const job = memberJobs[index];
   if (!job) return;
@@ -865,8 +963,7 @@ function openJobResult(index) {
   if (system.result === "prompt") {
     promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
   } else {
-    const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
-    setImageResults(imageUrls);
+    setJobResults(system, job);
   }
 
   document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -876,12 +973,13 @@ function openJobResult(index) {
 function renderJobProgress(system, job = {}) {
   const percent = Math.max(1, Math.min(Number(job.progress_percent || 8), 99));
   const activeStage = job.stage || "analyzing";
-  const stageOrder = ["analyzing", "encoding", "generating"];
+  const stageOrder = ["analyzing", "encoding", "generating", "uploading"];
   const activeIndex = Math.max(0, stageOrder.indexOf(activeStage));
   const stages = [
     ["analyzing", "分析使用者提供資訊"],
     ["encoding", "影像編碼中"],
     ["generating", "影像生成中"],
+    ["uploading", "成果整理與上傳中"],
   ];
   const markup = `
     <div class="job-progress">
@@ -925,7 +1023,7 @@ async function pollJob(jobId, system) {
       if (system.result === "prompt") {
         promptOutput.textContent = job.output_text || "任務完成，但沒有收到提示詞。";
       } else {
-        setImageResults(job.output_images || (job.output_image ? [job.output_image] : []));
+        setJobResults(system, job);
       }
       return;
     }
@@ -1042,10 +1140,13 @@ function renderApp() {
   systems.forEach((item) => systemList.append(systemButton(item)));
 
   systemsGrid.innerHTML = "";
-  systems.forEach((item) => systemsGrid.append(systemCard(item)));
+  systems
+    .filter((item) => item.id !== "A8-2")
+    .forEach((item) => systemsGrid.append(systemCard(item)));
 
   activeTier.textContent = `${system.tier} Access`;
-  activeTitle.textContent = `${system.id} ${system.title}`;
+  activeTitle.textContent =
+    system.activeTitle || `${system.displayId || system.id} ${system.title}`;
   activeDesc.textContent = system.desc;
   activeStatus.textContent = system.status;
   activeStatus.classList.toggle("pending", system.status !== "Live System");
