@@ -828,7 +828,12 @@ function renderInputs(system) {
   const generateButton = document.createElement("button");
   generateButton.className = "generate-button";
   generateButton.type = "button";
-  generateButton.textContent = system.result === "prompt" ? "產生提示詞" : "產生建築圖";
+  generateButton.textContent =
+    system.result === "prompt"
+      ? "產生提示詞"
+      : system.id === "A9"
+        ? "AI製作影片"
+        : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
   inputStack.append(generateButton);
 }
