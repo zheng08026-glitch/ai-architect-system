@@ -1250,15 +1250,6 @@ function getResultExtension(url, type) {
   return type === "video" ? "mp4" : "png";
 }
 
-function triggerDownload(url, filename) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-}
-
 function getSavePickerTypes(type, extension, mimeType) {
   const description = type === "video" ? "影片檔案" : type === "image" ? "圖片檔案" : "文字檔案";
   return [{
@@ -1270,24 +1261,19 @@ function getSavePickerTypes(type, extension, mimeType) {
 }
 
 async function chooseSaveHandle(filename, type, extension, mimeType) {
-  if (!window.showSaveFilePicker) return null;
+  if (!window.isSecureContext || !window.showSaveFilePicker) {
+    throw new Error("SAVE_PICKER_UNSUPPORTED");
+  }
   return window.showSaveFilePicker({
     suggestedName: filename,
     types: getSavePickerTypes(type, extension, mimeType),
   });
 }
 
-async function saveBlob(blob, filename, handle = null) {
-  if (handle) {
-    const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-    return;
-  }
-
-  const blobUrl = URL.createObjectURL(blob);
-  triggerDownload(blobUrl, filename);
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+async function saveBlob(blob, handle) {
+  const writable = await handle.createWritable();
+  await writable.write(blob);
+  await writable.close();
 }
 
 $("#downloadResult").addEventListener("click", async () => {
@@ -1302,10 +1288,15 @@ $("#downloadResult").addEventListener("click", async () => {
     try {
       const filename = `${filenameBase}.txt`;
       const handle = await chooseSaveHandle(filename, "text", "txt", "text/plain");
-      await saveBlob(blob, filename, handle);
+      await saveBlob(blob, handle);
       button.textContent = "Saved";
     } catch (error) {
-      button.textContent = error?.name === "AbortError" ? "Cancelled" : "Save failed";
+      button.textContent =
+        error?.name === "AbortError"
+          ? "Cancelled"
+          : error?.message === "SAVE_PICKER_UNSUPPORTED"
+            ? "Use Edge / Chrome"
+            : "Save failed";
     } finally {
       button.disabled = false;
       window.setTimeout(() => (button.textContent = "Save"), 1800);
@@ -1337,10 +1328,15 @@ $("#downloadResult").addEventListener("click", async () => {
     const response = await fetch(activeResultUrl);
     if (!response.ok) throw new Error(`Download failed: ${response.status}`);
     const blob = await response.blob();
-    await saveBlob(blob, filename, handle);
+    await saveBlob(blob, handle);
     button.textContent = "Saved";
   } catch (error) {
-    button.textContent = error?.name === "AbortError" ? "Cancelled" : "Save failed";
+    button.textContent =
+      error?.name === "AbortError"
+        ? "Cancelled"
+        : error?.message === "SAVE_PICKER_UNSUPPORTED"
+          ? "Use Edge / Chrome"
+          : "Save failed";
   } finally {
     button.disabled = false;
     window.setTimeout(() => (button.textContent = "Save"), 1800);
