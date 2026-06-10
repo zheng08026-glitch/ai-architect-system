@@ -1254,6 +1254,37 @@ function triggerDownload(url, filename) {
   link.remove();
 }
 
+function getSavePickerTypes(type, extension, mimeType) {
+  const description = type === "video" ? "影片檔案" : type === "image" ? "圖片檔案" : "文字檔案";
+  return [{
+    description,
+    accept: {
+      [mimeType.split(";")[0]]: [`.${extension}`],
+    },
+  }];
+}
+
+async function chooseSaveHandle(filename, type, extension, mimeType) {
+  if (!window.showSaveFilePicker) return null;
+  return window.showSaveFilePicker({
+    suggestedName: filename,
+    types: getSavePickerTypes(type, extension, mimeType),
+  });
+}
+
+async function saveBlob(blob, filename, handle = null) {
+  if (handle) {
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return;
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  triggerDownload(blobUrl, filename);
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
 $("#downloadResult").addEventListener("click", async () => {
   const system = getActiveSystem();
   const button = $("#downloadResult");
@@ -1261,11 +1292,19 @@ $("#downloadResult").addEventListener("click", async () => {
 
   if (system.result === "prompt") {
     const blob = new Blob([promptOutput.textContent.trim()], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    triggerDownload(url, `${filenameBase}.txt`);
-    URL.revokeObjectURL(url);
-    button.textContent = "Saved";
-    window.setTimeout(() => (button.textContent = "Save"), 1400);
+    button.disabled = true;
+    button.textContent = "Choose location...";
+    try {
+      const filename = `${filenameBase}.txt`;
+      const handle = await chooseSaveHandle(filename, "text", "txt", "text/plain");
+      await saveBlob(blob, filename, handle);
+      button.textContent = "Saved";
+    } catch (error) {
+      button.textContent = error?.name === "AbortError" ? "Cancelled" : "Save failed";
+    } finally {
+      button.disabled = false;
+      window.setTimeout(() => (button.textContent = "Save"), 1800);
+    }
     return;
   }
 
@@ -1277,18 +1316,26 @@ $("#downloadResult").addEventListener("click", async () => {
 
   button.textContent = "Saving...";
   button.disabled = true;
-  const filename = `${filenameBase}.${getResultExtension(activeResultUrl, activeResultType)}`;
+  const extension = getResultExtension(activeResultUrl, activeResultType);
+  const filename = `${filenameBase}.${extension}`;
 
   try {
+    button.textContent = "Choose location...";
+    const fallbackMimeType = activeResultType === "video" ? "video/mp4" : "image/png";
+    const handle = await chooseSaveHandle(
+      filename,
+      activeResultType,
+      extension,
+      fallbackMimeType,
+    );
+    button.textContent = "Saving...";
     const response = await fetch(activeResultUrl);
     if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-    const blobUrl = URL.createObjectURL(await response.blob());
-    triggerDownload(blobUrl, filename);
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    const blob = await response.blob();
+    await saveBlob(blob, filename, handle);
     button.textContent = "Saved";
-  } catch {
-    triggerDownload(activeResultUrl, filename);
-    button.textContent = "Download opened";
+  } catch (error) {
+    button.textContent = error?.name === "AbortError" ? "Cancelled" : "Save failed";
   } finally {
     button.disabled = false;
     window.setTimeout(() => (button.textContent = "Save"), 1800);
