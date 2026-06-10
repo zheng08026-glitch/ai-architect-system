@@ -1311,9 +1311,22 @@ async function chooseSaveHandle(filename, type, extension, mimeType) {
 }
 
 async function saveBlob(blob, handle) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  if (!bytes.byteLength) throw new Error("Result file is empty");
+
   const writable = await handle.createWritable();
-  await writable.write(blob);
+  await writable.write({
+    type: "write",
+    position: 0,
+    data: bytes,
+  });
+  await writable.truncate(bytes.byteLength);
   await writable.close();
+
+  const savedFile = await handle.getFile();
+  if (savedFile.size !== bytes.byteLength) {
+    throw new Error(`Saved file size mismatch: ${savedFile.size}/${bytes.byteLength}`);
+  }
 }
 
 $("#downloadResult").addEventListener("click", async () => {
