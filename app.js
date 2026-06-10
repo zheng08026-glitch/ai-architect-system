@@ -140,6 +140,8 @@ const systems = [
 let activeId = "A1";
 const previews = new Map();
 const uploadedFiles = new Map();
+let activeResultUrl = "";
+let activeResultType = "";
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -832,6 +834,8 @@ function renderInputs(system) {
 }
 
 function renderResult(system) {
+  activeResultUrl = "";
+  activeResultType = "";
   const isPrompt = system.result === "prompt";
   resultTitle.textContent = isPrompt
     ? "提示詞結果"
@@ -885,6 +889,8 @@ function getOriginalPreview(system) {
 }
 
 function setComparisonResult(originalUrl, resultUrl) {
+  activeResultUrl = resultUrl;
+  activeResultType = "image";
   mainPreview.innerHTML = `
     <div class="image-compare">
       <img src="${originalUrl}" alt="處理前圖片" />
@@ -906,10 +912,14 @@ function setComparisonResult(originalUrl, resultUrl) {
 
 function setImageResults(imageUrls) {
   if (!imageUrls.length) {
+    activeResultUrl = "";
+    activeResultType = "";
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
     return;
   }
 
+  activeResultUrl = imageUrls[0];
+  activeResultType = "image";
   mainPreview.innerHTML = `<img src="${imageUrls[0]}" alt="AI render result" />`;
   thumbGrid.innerHTML = "";
   imageUrls.forEach((imageUrl, index) => {
@@ -917,6 +927,8 @@ function setImageResults(imageUrls) {
     button.type = "button";
     button.innerHTML = `<img src="${imageUrl}" alt="Result ${index + 1}" />`;
     button.addEventListener("click", () => {
+      activeResultUrl = imageUrl;
+      activeResultType = "image";
       mainPreview.innerHTML = `<img src="${imageUrl}" alt="AI render result" />`;
     });
     thumbGrid.append(button);
@@ -925,11 +937,15 @@ function setImageResults(imageUrls) {
 
 function setVideoResults(videoUrls) {
   if (!videoUrls.length) {
+    activeResultUrl = "";
+    activeResultType = "";
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
     thumbGrid.innerHTML = "";
     return;
   }
 
+  activeResultUrl = videoUrls[0];
+  activeResultType = "video";
   mainPreview.innerHTML = `
     <video controls playsinline preload="metadata">
       <source src="${videoUrls[0]}" />
@@ -1155,33 +1171,128 @@ function renderApp() {
   renderResult(system);
 }
 
+async function convertImageBlobToPng(blob) {
+  if (blob.type === "image/png") return blob;
+
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (pngBlob) => (pngBlob ? resolve(pngBlob) : reject(new Error("PNG conversion failed"))),
+      "image/png",
+    );
+  });
+}
+
 $("#copyResult").addEventListener("click", async () => {
   const system = getActiveSystem();
-  const text =
-    system.result === "prompt"
-      ? promptOutput.textContent.trim()
-      : "成果圖可在結果區預覽與下載。";
+  const button = $("#copyResult");
+  button.disabled = true;
+
   try {
-    await navigator.clipboard.writeText(text);
-    $("#copyResult").textContent = "Copied";
-    window.setTimeout(() => ($("#copyResult").textContent = "Copy"), 1200);
+    if (system.result === "prompt") {
+      await navigator.clipboard.writeText(promptOutput.textContent.trim());
+      button.textContent = "Copied";
+      return;
+    }
+
+    if (!activeResultUrl) {
+      button.textContent = "No result";
+      return;
+    }
+
+    if (activeResultType === "image" && window.ClipboardItem && navigator.clipboard.write) {
+      const response = await fetch(activeResultUrl);
+      if (!response.ok) throw new Error(`Copy failed: ${response.status}`);
+      const pngBlob = await convertImageBlobToPng(await response.blob());
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      button.textContent = "Image copied";
+      return;
+    }
+
+    await navigator.clipboard.writeText(activeResultUrl);
+    button.textContent = activeResultType === "video" ? "Video link copied" : "Link copied";
   } catch {
-    $("#copyResult").textContent = "Copy failed";
-    window.setTimeout(() => ($("#copyResult").textContent = "Copy"), 1200);
+    try {
+      if (activeResultUrl) {
+        await navigator.clipboard.writeText(activeResultUrl);
+        button.textContent = "Link copied";
+      } else {
+        button.textContent = "Copy failed";
+      }
+    } catch {
+      button.textContent = "Copy failed";
+    }
+  } finally {
+    button.disabled = false;
+    window.setTimeout(() => (button.textContent = "Copy"), 1800);
   }
 });
 
-$("#downloadResult").addEventListener("click", () => {
-  const system = getActiveSystem();
-  if (system.result !== "prompt") return;
+function getResultExtension(url, type) {
+  try {
+    const extension = new URL(url, window.location.href).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1];
+    if (extension) return extension.toLowerCase();
+  } catch {
+    // Use a sensible default when the result URL cannot be parsed.
+  }
+  return type === "video" ? "mp4" : "png";
+}
 
-  const blob = new Blob([promptOutput.textContent.trim()], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+function triggerDownload(url, filename) {
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${activeId.toLowerCase()}-architect-ai-result.txt`;
+  link.download = filename;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+}
+
+$("#downloadResult").addEventListener("click", async () => {
+  const system = getActiveSystem();
+  const button = $("#downloadResult");
+  const filenameBase = `${activeId.toLowerCase()}-architect-ai-result`;
+
+  if (system.result === "prompt") {
+    const blob = new Blob([promptOutput.textContent.trim()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, `${filenameBase}.txt`);
+    URL.revokeObjectURL(url);
+    button.textContent = "Saved";
+    window.setTimeout(() => (button.textContent = "Save"), 1400);
+    return;
+  }
+
+  if (!activeResultUrl) {
+    button.textContent = "No result";
+    window.setTimeout(() => (button.textContent = "Save"), 1600);
+    return;
+  }
+
+  button.textContent = "Saving...";
+  button.disabled = true;
+  const filename = `${filenameBase}.${getResultExtension(activeResultUrl, activeResultType)}`;
+
+  try {
+    const response = await fetch(activeResultUrl);
+    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+    const blobUrl = URL.createObjectURL(await response.blob());
+    triggerDownload(blobUrl, filename);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    button.textContent = "Saved";
+  } catch {
+    triggerDownload(activeResultUrl, filename);
+    button.textContent = "Download opened";
+  } finally {
+    button.disabled = false;
+    window.setTimeout(() => (button.textContent = "Save"), 1800);
+  }
 });
 
 const authDialog = $("#authDialog");
