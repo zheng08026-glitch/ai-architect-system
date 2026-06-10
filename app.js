@@ -142,6 +142,8 @@ const previews = new Map();
 const uploadedFiles = new Map();
 let activeResultUrl = "";
 let activeResultType = "";
+let activeResultBlob = null;
+let activeResultBlobPromise = null;
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -841,6 +843,8 @@ function renderInputs(system) {
 function renderResult(system) {
   activeResultUrl = "";
   activeResultType = "";
+  activeResultBlob = null;
+  activeResultBlobPromise = null;
   const isPrompt = system.result === "prompt";
   resultTitle.textContent = isPrompt
     ? "提示詞結果"
@@ -896,6 +900,7 @@ function getOriginalPreview(system) {
 function setComparisonResult(originalUrl, resultUrl) {
   activeResultUrl = resultUrl;
   activeResultType = "image";
+  prepareResultBlob(resultUrl);
   mainPreview.innerHTML = `
     <div class="image-compare">
       <img src="${originalUrl}" alt="處理前圖片" />
@@ -919,12 +924,15 @@ function setImageResults(imageUrls) {
   if (!imageUrls.length) {
     activeResultUrl = "";
     activeResultType = "";
+    activeResultBlob = null;
+    activeResultBlobPromise = null;
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
     return;
   }
 
   activeResultUrl = imageUrls[0];
   activeResultType = "image";
+  prepareResultBlob(imageUrls[0]);
   mainPreview.innerHTML = `<img src="${imageUrls[0]}" alt="AI render result" />`;
   thumbGrid.innerHTML = "";
   imageUrls.forEach((imageUrl, index) => {
@@ -934,6 +942,7 @@ function setImageResults(imageUrls) {
     button.addEventListener("click", () => {
       activeResultUrl = imageUrl;
       activeResultType = "image";
+      prepareResultBlob(imageUrl);
       mainPreview.innerHTML = `<img src="${imageUrl}" alt="AI render result" />`;
     });
     thumbGrid.append(button);
@@ -944,6 +953,8 @@ function setVideoResults(videoUrls) {
   if (!videoUrls.length) {
     activeResultUrl = "";
     activeResultType = "";
+    activeResultBlob = null;
+    activeResultBlobPromise = null;
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
     thumbGrid.innerHTML = "";
     return;
@@ -951,6 +962,7 @@ function setVideoResults(videoUrls) {
 
   activeResultUrl = videoUrls[0];
   activeResultType = "video";
+  prepareResultBlob(videoUrls[0]);
   mainPreview.innerHTML = `
     <video controls playsinline preload="metadata">
       <source src="${videoUrls[0]}" />
@@ -1250,6 +1262,34 @@ function getResultExtension(url, type) {
   return type === "video" ? "mp4" : "png";
 }
 
+function getBlobExtension(blob, url, type) {
+  const extensionsByMimeType = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+  };
+  return extensionsByMimeType[blob.type.split(";")[0]] || getResultExtension(url, type);
+}
+
+function prepareResultBlob(url) {
+  activeResultBlob = null;
+  activeResultBlobPromise = fetch(url)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+      return response.blob();
+    })
+    .then((blob) => {
+      if (!blob.size) throw new Error("Downloaded result is empty");
+      if (blob.type.startsWith("text/")) throw new Error("Downloaded result is not media");
+      if (url === activeResultUrl) activeResultBlob = blob;
+      return blob;
+    })
+    .catch(() => null);
+}
+
 function getSavePickerTypes(type, extension, mimeType) {
   const description = type === "video" ? "影片檔案" : type === "image" ? "圖片檔案" : "文字檔案";
   return [{
@@ -1310,9 +1350,19 @@ $("#downloadResult").addEventListener("click", async () => {
     return;
   }
 
+  if (!activeResultBlob) {
+    button.disabled = true;
+    button.textContent = "Preparing...";
+    const blob = await activeResultBlobPromise;
+    button.disabled = false;
+    button.textContent = blob?.size ? "Ready - click Save" : "Save failed";
+    window.setTimeout(() => (button.textContent = "Save"), 2400);
+    return;
+  }
+
   button.textContent = "Saving...";
   button.disabled = true;
-  const extension = getResultExtension(activeResultUrl, activeResultType);
+  const extension = getBlobExtension(activeResultBlob, activeResultUrl, activeResultType);
   const filename = `${filenameBase}.${extension}`;
 
   try {
@@ -1322,13 +1372,10 @@ $("#downloadResult").addEventListener("click", async () => {
       filename,
       activeResultType,
       extension,
-      fallbackMimeType,
+      activeResultBlob.type || fallbackMimeType,
     );
     button.textContent = "Saving...";
-    const response = await fetch(activeResultUrl);
-    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-    const blob = await response.blob();
-    await saveBlob(blob, handle);
+    await saveBlob(activeResultBlob, handle);
     button.textContent = "Saved";
   } catch (error) {
     button.textContent =
