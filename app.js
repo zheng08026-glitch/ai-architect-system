@@ -694,6 +694,24 @@ async function refreshAuthSession() {
   await loadMemberCenter();
 }
 
+function handleAuthCallbackError() {
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get("error");
+  const description = params.get("error_description") || "";
+  if (!error) return;
+
+  const isMissingState = description.toLowerCase().includes("state parameter missing");
+  authMessage.textContent = isMissingState
+    ? "Google 登入流程已過期，請重新按「使用 Google 帳號繼續」。"
+    : `登入失敗：${description || error}`;
+  if (!authDialog.open) authDialog.showModal();
+
+  ["error", "error_code", "error_description"].forEach((key) => params.delete(key));
+  const cleanQuery = params.toString();
+  const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`;
+  window.history.replaceState({}, document.title, cleanUrl);
+}
+
 function requiresMember(system) {
   return !["A1", "A2"].includes(system.id);
 }
@@ -1510,13 +1528,20 @@ async function loginWithGoogle() {
     return;
   }
 
+  authGoogle.disabled = true;
+  authMessage.textContent = "正在前往 Google 登入...";
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
   const { error } = await client.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin,
+      redirectTo,
+      scopes: "openid email profile",
     },
   });
-  if (error) authMessage.textContent = error.message;
+  if (error) {
+    authMessage.textContent = error.message || "Google 登入啟動失敗，請稍後再試。";
+    authGoogle.disabled = false;
+  }
 }
 
 async function signOut() {
@@ -1617,8 +1642,8 @@ themeButtons.forEach((button) => {
 
 setTheme(localStorage.getItem("architect-ai-theme") || "violet");
 updateAuthUi();
-refreshAuthSession();
-getSupabaseClient()?.auth.onAuthStateChange(async (_event, session) => {
+refreshAuthSession().finally(handleAuthCallbackError);
+getSupabaseClient()?.auth.onAuthStateChange(async (event, session) => {
   if (session?.access_token) {
     localStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
     localStorage.setItem(AUTH_EMAIL_KEY, session.user?.email || "");
@@ -1628,6 +1653,7 @@ getSupabaseClient()?.auth.onAuthStateChange(async (_event, session) => {
   }
   updateAuthUi();
   await loadMemberCenter();
+  if (event === "SIGNED_IN" && authDialog?.open) authDialog.close();
 });
 
 document.querySelectorAll("[data-scroll-target]").forEach((button) => {
