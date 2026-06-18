@@ -465,6 +465,8 @@ function renderAdminMembers(records = []) {
             <button class="text-button" type="button" data-admin-action="details">Details</button>
             <button class="text-button" type="button" data-admin-action="save">Save</button>
             <button class="text-button" type="button" data-admin-action="grant-package">Open +50 / +5</button>
+            <button class="text-button" type="button" data-admin-action="grant-jpg">JPG +10</button>
+            <button class="text-button" type="button" data-admin-action="grant-mp4">MP4 +10</button>
           </div>
         </div>
       `;
@@ -631,6 +633,16 @@ async function handleAdminMemberAction(event) {
           reason: "Promotional access opened by admin",
         }),
       });
+    } else if (action === "grant-jpg" || action === "grant-mp4") {
+      const isJpgGrant = action === "grant-jpg";
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
+        method: "POST",
+        body: JSON.stringify({
+          bucket: isJpgGrant ? "member_a1_a8_monthly" : "member_a9_monthly",
+          amount: 10,
+          reason: isJpgGrant ? "JPG +10 granted by admin" : "MP4 +10 granted by admin",
+        }),
+      });
     }
     if (action !== "details") await loadAdminDashboard();
   } catch (error) {
@@ -793,6 +805,16 @@ function uploadField(input) {
 
 const A9_HORIZONTAL_PROMPT =
   "(Camera moving from left to right:1.5), shooting clockwise around a horizontal plane. A cinematic aerial drone captures a sunset over a  building. The view sweeps steadily to the right, revealing the right side of the building structure. The background blurs as the camera circles in a clockwise arc. Golden hour lighting, high-speed motion blur on surroundings, building remains sharp and centered. Architectural consistency, stable geometry, 4k, professional advertising style.";
+const A9_FLY_AROUND_PROMPT =
+  "Stable drone shot, flying around the skyscraper complex, smooth sweeping cinematic arc movement, breathtaking architectural perspective.";
+const A9_ORBIT_PROMPT =
+  "Smooth architectural camera orbit around the building corner, locking focus on the structure, parallax effect, flawless vertical lines.";
+
+const A9_PROMPT_PRESETS = {
+  horizontal: A9_HORIZONTAL_PROMPT,
+  "fly-around": A9_FLY_AROUND_PROMPT,
+  orbit: A9_ORBIT_PROMPT,
+};
 
 function textPromptField(system) {
   const wrapper = document.createElement("div");
@@ -811,8 +833,8 @@ function textPromptField(system) {
           <div class="prompt-presets" aria-label="推薦提示詞">
             <span>推薦提示詞</span>
             <button type="button" data-prompt-preset="horizontal">1. 水平移動</button>
-            <button type="button" disabled>2. 待更新</button>
-            <button type="button" disabled>3. 待更新</button>
+            <button type="button" data-prompt-preset="fly-around">2. Fly Around（航拍大範圍透視）</button>
+            <button type="button" data-prompt-preset="orbit">3. Orbit（建築環繞／3D 透視）</button>
             <button type="button" disabled>4. 待更新</button>
             <button type="button" disabled>5. 待更新</button>
           </div>
@@ -820,8 +842,10 @@ function textPromptField(system) {
         : ""
     }
   `;
-  wrapper.querySelector('[data-prompt-preset="horizontal"]')?.addEventListener("click", () => {
-    wrapper.querySelector("#customPrompt").value = A9_HORIZONTAL_PROMPT;
+  wrapper.querySelectorAll("[data-prompt-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wrapper.querySelector("#customPrompt").value = A9_PROMPT_PRESETS[button.dataset.promptPreset] || "";
+    });
   });
   return wrapper;
 }
@@ -856,6 +880,12 @@ function renderInputs(system) {
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
   inputStack.append(generateButton);
+
+  const usageNotice = document.createElement("p");
+  usageNotice.className = "generation-notice";
+  usageNotice.innerHTML =
+    'AI 成果僅供提案、設計討論與概念視覺化，可能有錯誤或變形，送出前請確認素材權利，使用與公開發布前請自行檢查。<a href="#usage-notice">查看完整使用須知</a>';
+  inputStack.append(usageNotice);
 }
 
 function renderResult(system) {
