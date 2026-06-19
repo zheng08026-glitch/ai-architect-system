@@ -979,6 +979,16 @@ textarea {
   line-height: 1.65;
 }
 
+.input-stack.multi-image-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.input-stack.multi-image-inputs .generate-button,
+.input-stack.multi-image-inputs .generation-notice {
+  grid-column: 1 / -1;
+}
+
 .generation-notice a {
   display: inline-block;
   margin-left: 0.35em;
@@ -1041,6 +1051,10 @@ textarea {
 }
 
 @media (max-width: 720px) {
+  .input-stack.multi-image-inputs {
+    grid-template-columns: 1fr;
+  }
+
   .usage-notice-highlights {
     grid-template-columns: 1fr;
   }

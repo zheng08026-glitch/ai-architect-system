@@ -124,16 +124,39 @@ const systems = [
     prompt: false,
   },
   {
-    id: "A9",
-    title: "Motion Render",
-    subtitle: "AI 建築動畫輸出",
-    desc: "將建築透視圖轉為鏡頭動畫，服務建商、代銷與簡報需求。",
+    id: "A9-1",
+    gridDisplayId: "A9",
+    activeTitle: "A9-1｜AI Motion Render",
+    title: "AI Motion Render",
+    subtitle: "單張圖像轉 AI 建築動畫",
+    desc: "上傳 1 張建築圖像並選擇鏡頭提示詞，生成具有運鏡效果的 AI 動畫影片。",
     tier: "Pro",
     status: "Live System",
     result: "video",
-    inputs: [{ key: "building", label: "建築透視圖 / Render" }],
+    inputs: [{ key: "image", label: "建築圖像 / Render" }],
     count: false,
     prompt: true,
+  },
+  {
+    id: "A9-2",
+    activeTitle: "A9_V2｜AI Motion Render",
+    title: "AI Motion Render",
+    subtitle: "7 張關鍵圖像轉 AI 動畫",
+    desc: "依序上傳 7 張關鍵圖像，等待約 10 分鐘生成一段 AI 動畫影片。適用於施工動畫模擬、立面表情轉換與室內場景變化。",
+    tier: "Pro",
+    status: "Live System",
+    result: "video",
+    inputs: [
+      { key: "image_1", label: "關鍵圖像 1｜起始畫面" },
+      { key: "image_2", label: "關鍵圖像 2" },
+      { key: "image_3", label: "關鍵圖像 3" },
+      { key: "image_4", label: "關鍵圖像 4" },
+      { key: "image_5", label: "關鍵圖像 5" },
+      { key: "image_6", label: "關鍵圖像 6" },
+      { key: "image_7", label: "關鍵圖像 7｜結束畫面" },
+    ],
+    count: false,
+    prompt: false,
   },
 ];
 
@@ -819,7 +842,7 @@ const A9_PROMPT_PRESETS = {
 function textPromptField(system) {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
-  const isA9 = system.id === "A9";
+  const isA9 = system.id === "A9-1";
   wrapper.innerHTML = `
     <label for="customPrompt">${isA9 ? "影像提示詞" : "建築提示詞"}</label>
     <textarea id="customPrompt" placeholder="${
@@ -865,6 +888,7 @@ function countField() {
 
 function renderInputs(system) {
   inputStack.innerHTML = "";
+  inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
   if (system.prompt) inputStack.append(textPromptField(system));
   if (system.count) inputStack.append(countField());
@@ -875,7 +899,7 @@ function renderInputs(system) {
   generateButton.textContent =
     system.result === "prompt"
       ? "產生提示詞"
-      : system.id === "A9"
+      : system.result === "video"
         ? "AI製作影片"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
@@ -896,7 +920,7 @@ function renderResult(system) {
   const isPrompt = system.result === "prompt";
   resultTitle.textContent = isPrompt
     ? "提示詞結果"
-    : system.id === "A9"
+    : system.result === "video"
       ? "AI演算影像結果"
       : "建築圖結果";
   promptOutput.classList.toggle("hidden", !isPrompt);
@@ -1222,7 +1246,7 @@ function renderApp() {
 
   systemsGrid.innerHTML = "";
   systems
-    .filter((item) => item.id !== "A8-2")
+    .filter((item) => !["A8-2", "A9-2"].includes(item.id))
     .forEach((item) => systemsGrid.append(systemCard(item)));
 
   activeTier.textContent = `${system.tier} Access`;
