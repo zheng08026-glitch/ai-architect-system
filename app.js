@@ -1480,6 +1480,18 @@ document.querySelectorAll("[data-open-auth]").forEach((button) => {
   button.addEventListener("click", () => authDialog.showModal());
 });
 
+const contactDialog = $("#contactDialog");
+document.querySelectorAll("[data-open-contact]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!contactDialog?.open) contactDialog?.showModal();
+  });
+});
+
+contactDialog?.addEventListener("click", (event) => {
+  if (event.target === contactDialog) contactDialog.close();
+});
+
 async function loginWithEmail() {
   const email = authEmail?.value.trim();
   const password = authPassword?.value || "";

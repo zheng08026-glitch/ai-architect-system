@@ -1744,6 +1744,107 @@ body[data-theme="white"] .badge::before {
   font-size: 22px;
 }
 
+.contact-dialog {
+  width: min(92vw, 590px);
+  overflow: hidden;
+}
+
+.contact-dialog-content {
+  display: grid;
+  gap: 18px;
+}
+
+.contact-dialog-content h2 {
+  margin: -4px 0 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.contact-intro {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.contact-email {
+  display: grid;
+  gap: 5px;
+  padding: 17px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.contact-email:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.contact-email span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.contact-email strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1rem, 3.5vw, 1.25rem);
+}
+
+.social-links {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.social-link {
+  display: grid;
+  min-height: 112px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 14px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 800;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.social-link:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.social-link svg {
+  width: 34px;
+  height: 34px;
+  fill: currentColor;
+}
+
+.social-link.instagram svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.social-link.instagram .social-icon-dot {
+  fill: currentColor;
+  stroke: none;
+}
+
 .auth-dialog label {
   display: grid;
   gap: 8px;
@@ -2225,6 +2326,20 @@ body[data-theme="white"] .badge::before {
 
   .thumb-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contact-dialog {
+    padding: 22px 18px;
+  }
+
+  .social-links {
+    grid-template-columns: 1fr;
+  }
+
+  .social-link {
+    grid-template-columns: 32px auto;
+    min-height: 62px;
+    justify-content: center;
   }
 }
 

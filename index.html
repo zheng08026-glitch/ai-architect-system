@@ -14,7 +14,7 @@
     <meta property="og:image" content="./assets/hero-system.png" />
     <meta name="theme-color" content="#050711" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=a9-v2-20260619" />
+    <link rel="stylesheet" href="./styles.css?v=contact-modal-20260620" />
   </head>
   <body>
     <div class="site-shell">
@@ -30,7 +30,7 @@
         <nav class="desktop-nav" aria-label="主要導覽">
           <a href="#systems">AI Systems</a>
           <a href="#pricing">Pricing</a>
-          <a href="#contact">Contact</a>
+          <a href="#contact" data-open-contact>Contact</a>
         </nav>
 
         <div class="top-actions">
@@ -227,7 +227,7 @@
                 <li>A9 每次開通增加 5 次</li>
                 <li>正式收費方案將另行公告</li>
               </ul>
-              <a href="#contact">聯絡我們</a>
+              <a href="#contact" data-open-contact>聯絡我們</a>
             </article>
           </div>
         </section>
@@ -274,7 +274,7 @@
                 <li>A9 建築動畫輸出</li>
                 <li>適合建商、代銷與大型團隊</li>
               </ul>
-              <a href="#contact">聯絡我們</a>
+              <a href="#contact" data-open-contact>聯絡我們</a>
             </article>
           </div>
         </section>
@@ -319,10 +319,67 @@
               前端定稿後，下一步可接會員權限、點數扣除、任務排程、成果儲存與後台管理。
             </p>
           </div>
-          <a class="primary-button" href="mailto:hello@architect-ai.system">Contact</a>
+          <button class="primary-button" type="button" data-open-contact>聯絡我們</button>
         </section>
       </main>
     </div>
+
+    <dialog class="auth-dialog contact-dialog" id="contactDialog" aria-labelledby="contactDialogTitle">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="關閉聯絡視窗">×</button>
+      </form>
+      <div class="contact-dialog-content">
+        <p class="eyebrow"><span></span> Contact</p>
+        <h2 id="contactDialogTitle">聯絡我們</h2>
+        <p class="contact-intro">如有額外使用需求、合作提案或系統問題，歡迎聯絡管理員。</p>
+
+        <a class="contact-email" href="mailto:zheng08026@gmail.com">
+          <span>管理員</span>
+          <strong>zheng08026@gmail.com</strong>
+        </a>
+
+        <div class="social-links" aria-label="社群連結">
+          <a
+            class="social-link facebook"
+            href="https://www.facebook.com/zheng08026?locale=zh_TW"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="前往 Facebook"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 8.2V6.5c0-.8.5-1 1-1h2.8V1.2L14 1c-4 0-5 2.4-5 5v2.2H6v4.9h3V23h5v-9.9h3.4l.6-4.9H14Z" />
+            </svg>
+            <span>Facebook</span>
+          </a>
+          <a
+            class="social-link instagram"
+            href="https://www.instagram.com/zhengyu08026?fbclid=IwY2xjawSiiYJleHRuA2FlbQIxMABicmlkETFTcDM5bndRTlFFcTU0ZEtqc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHoddRrKd3tLbm6hz8Eb8l46uH3VKJitAQVYrkCd3tCdYYKij1_1rBjB6GWtP_aem_KTnXVvd6un_0VC0mvtMdJA"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="前往 Instagram"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+              <circle cx="12" cy="12" r="4.25" />
+              <circle class="social-icon-dot" cx="17.6" cy="6.5" r="1" />
+            </svg>
+            <span>Instagram</span>
+          </a>
+          <a
+            class="social-link threads"
+            href="https://www.threads.com/@zhengyu08026?hl=zh-tw"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="前往 Threads"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17.8 10.4c-.2-3.4-2.1-5.2-5.6-5.2-3.7 0-6 2.6-6 6.8 0 4.3 2.3 6.9 6 6.9 2.9 0 5-1.6 5-3.8 0-2-1.7-3.3-4.3-3.3-2.4 0-4 1.1-4 2.8 0 1.5 1.3 2.5 3.1 2.5 3.8 0 6.2-2.5 6.2-6.4 0-5.7-2.5-8.8-7-8.8-5.2 0-8.4 3.8-8.4 10s3.3 10.1 8.7 10.1c3.1 0 5.7-1 7.4-3l-1.5-1.5c-1.4 1.6-3.3 2.3-5.8 2.3-4.1 0-6.5-3-6.5-7.9 0-4.8 2.3-7.8 6.1-7.8 3.2 0 4.9 2.1 4.9 6.2 0 3.1-1.5 4.8-4 4.8-.7 0-1.2-.3-1.2-.7 0-.5.7-.8 1.9-.8 1.6 0 2.4.6 2.4 1.7 0 .3 0 .5-.1.8h2.3c.2-.6.3-1.2.3-1.8 0-1.5-.6-2.8-1.7-3.7Z" />
+            </svg>
+            <span>Threads</span>
+          </a>
+        </div>
+      </div>
+    </dialog>
 
     <dialog class="auth-dialog" id="authDialog">
       <form method="dialog">
@@ -451,6 +508,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=member-usage-20260604"></script>
-    <script src="./app.js?v=a9-v2-20260619"></script>
+    <script src="./app.js?v=contact-modal-20260620"></script>
   </body>
 </html>
