@@ -70,7 +70,7 @@ const systems = [
     id: "A6-1",
     gridDisplayId: "A6",
     activeTitle: "A6-1｜創意多視角",
-    title: "AI Multi-View Render",
+    title: "創意多視角",
     subtitle: "單張圖AI產生8個視角",
     desc: "上傳一張完成的建築渲染圖，由 AI 快速延伸近景、廣角、左右 45°、左右 90°、鳥瞰與低角度等 8 個透視視角。",
     tier: "Plus",
@@ -83,7 +83,7 @@ const systems = [
   {
     id: "A6-2",
     activeTitle: "A6-2｜經典多視角",
-    title: "AI Multi-View Render",
+    title: "經典多視角",
     subtitle: "單張圖AI產生8個經典視角",
     desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
     tier: "Plus",
