@@ -67,18 +67,30 @@ const systems = [
     prompt: false,
   },
   {
-    id: "A6",
-    title: "Style Sketch HD",
-    subtitle: "風格圖 + Sketch + HD",
-    desc: "針對需要簡報與提案輸出的情境，產出高解析建築渲染。",
+    id: "A6-1",
+    gridDisplayId: "A6",
+    activeTitle: "A6-1｜快速多視角",
+    title: "AI Multi-View Render",
+    subtitle: "單張渲染圖快速生成 8 個建築視角",
+    desc: "上傳一張完成的建築渲染圖，由 AI 快速延伸近景、廣角、左右 45°、左右 90°、鳥瞰與低角度等 8 個透視視角。",
     tier: "Plus",
     status: "Live System",
     result: "image",
-    inputs: [
-      { key: "sketch", label: "Sketch / 3D 量體圖" },
-      { key: "style", label: "風格參考圖" },
-    ],
-    count: true,
+    inputs: [{ key: "building", label: "完成的建築渲染圖" }],
+    count: false,
+    prompt: false,
+  },
+  {
+    id: "A6-2",
+    activeTitle: "A6-2｜精準多視角",
+    title: "AI Multi-View Render",
+    subtitle: "單張渲染圖精準生成 8 個建築視角",
+    desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
+    tier: "Plus",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "building", label: "完成的建築渲染圖" }],
+    count: false,
     prompt: false,
   },
   {
@@ -901,6 +913,8 @@ function renderInputs(system) {
       ? "產生提示詞"
       : system.result === "video"
         ? "AI製作影片"
+        : ["A6-1", "A6-2"].includes(system.id)
+          ? "生成 8 個建築視角"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
   inputStack.append(generateButton);
@@ -1246,7 +1260,7 @@ function renderApp() {
 
   systemsGrid.innerHTML = "";
   systems
-    .filter((item) => !["A8-2", "A9-2"].includes(item.id))
+    .filter((item) => !["A6-2", "A8-2", "A9-2"].includes(item.id))
     .forEach((item) => systemsGrid.append(systemCard(item)));
 
   activeTier.textContent = `${system.tier} Access`;
