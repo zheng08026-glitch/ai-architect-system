@@ -179,6 +179,7 @@ let activeResultUrl = "";
 let activeResultType = "";
 let activeResultBlob = null;
 let activeResultBlobPromise = null;
+let activeResultUrls = [];
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -931,6 +932,14 @@ function renderResult(system) {
   activeResultType = "";
   activeResultBlob = null;
   activeResultBlobPromise = null;
+  activeResultUrls = [];
+  const downloadButton = $("#downloadResult");
+  if (downloadButton) {
+    downloadButton.textContent = ["A6-1", "A6-2"].includes(system.id) ? "Save ZIP" : "Save";
+    downloadButton.title = ["A6-1", "A6-2"].includes(system.id)
+      ? "下載 8 張成果 ZIP"
+      : "下載成果";
+  }
   const isPrompt = system.result === "prompt";
   resultTitle.textContent = isPrompt
     ? "提示詞結果"
@@ -986,6 +995,7 @@ function getOriginalPreview(system) {
 function setComparisonResult(originalUrl, resultUrl) {
   activeResultUrl = resultUrl;
   activeResultType = "image";
+  activeResultUrls = [resultUrl];
   prepareResultBlob(resultUrl);
   mainPreview.innerHTML = `
     <div class="image-compare">
@@ -1012,10 +1022,12 @@ function setImageResults(imageUrls) {
     activeResultType = "";
     activeResultBlob = null;
     activeResultBlobPromise = null;
+    activeResultUrls = [];
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
     return;
   }
 
+  activeResultUrls = [...imageUrls];
   activeResultUrl = imageUrls[0];
   activeResultType = "image";
   prepareResultBlob(imageUrls[0]);
@@ -1041,11 +1053,13 @@ function setVideoResults(videoUrls) {
     activeResultType = "";
     activeResultBlob = null;
     activeResultBlobPromise = null;
+    activeResultUrls = [];
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
     thumbGrid.innerHTML = "";
     return;
   }
 
+  activeResultUrls = [...videoUrls];
   activeResultUrl = videoUrls[0];
   activeResultType = "video";
   prepareResultBlob(videoUrls[0]);
@@ -1377,7 +1391,14 @@ function prepareResultBlob(url) {
 }
 
 function getSavePickerTypes(type, extension, mimeType) {
-  const description = type === "video" ? "影片檔案" : type === "image" ? "圖片檔案" : "文字檔案";
+  const description =
+    type === "video"
+      ? "影片檔案"
+      : type === "image"
+        ? "圖片檔案"
+        : type === "archive"
+          ? "ZIP 壓縮檔"
+          : "文字檔案";
   return [{
     description,
     accept: {
@@ -1415,9 +1436,140 @@ async function saveBlob(blob, handle) {
   }
 }
 
+function getDownloadButtonLabel(system = getActiveSystem()) {
+  return ["A6-1", "A6-2"].includes(system.id) ? "Save ZIP" : "Save";
+}
+
+function getCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeUint16(view, offset, value) {
+  view.setUint16(offset, value, true);
+}
+
+function writeUint32(view, offset, value) {
+  view.setUint32(offset, value >>> 0, true);
+}
+
+function getDosDateTime(date = new Date()) {
+  const year = Math.max(1980, date.getFullYear());
+  return {
+    date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+    time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+  };
+}
+
+async function createStoredZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  const { date, time } = getDosDateTime();
+  let localOffset = 0;
+
+  for (const file of files) {
+    const nameBytes = encoder.encode(file.name);
+    const data = new Uint8Array(await file.blob.arrayBuffer());
+    if (!data.byteLength) throw new Error(`Empty ZIP entry: ${file.name}`);
+    const crc32 = getCrc32(data);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const localView = new DataView(localHeader.buffer);
+    writeUint32(localView, 0, 0x04034b50);
+    writeUint16(localView, 4, 20);
+    writeUint16(localView, 6, 0x0800);
+    writeUint16(localView, 8, 0);
+    writeUint16(localView, 10, time);
+    writeUint16(localView, 12, date);
+    writeUint32(localView, 14, crc32);
+    writeUint32(localView, 18, data.byteLength);
+    writeUint32(localView, 22, data.byteLength);
+    writeUint16(localView, 26, nameBytes.length);
+    writeUint16(localView, 28, 0);
+    localHeader.set(nameBytes, 30);
+    localParts.push(localHeader, data);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(centralHeader.buffer);
+    writeUint32(centralView, 0, 0x02014b50);
+    writeUint16(centralView, 4, 20);
+    writeUint16(centralView, 6, 20);
+    writeUint16(centralView, 8, 0x0800);
+    writeUint16(centralView, 10, 0);
+    writeUint16(centralView, 12, time);
+    writeUint16(centralView, 14, date);
+    writeUint32(centralView, 16, crc32);
+    writeUint32(centralView, 20, data.byteLength);
+    writeUint32(centralView, 24, data.byteLength);
+    writeUint16(centralView, 28, nameBytes.length);
+    writeUint16(centralView, 30, 0);
+    writeUint16(centralView, 32, 0);
+    writeUint16(centralView, 34, 0);
+    writeUint16(centralView, 36, 0);
+    writeUint32(centralView, 38, 0);
+    writeUint32(centralView, 42, localOffset);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+
+    localOffset += localHeader.byteLength + data.byteLength;
+  }
+
+  const centralSize = centralParts.reduce((total, part) => total + part.byteLength, 0);
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  writeUint32(endView, 0, 0x06054b50);
+  writeUint16(endView, 4, 0);
+  writeUint16(endView, 6, 0);
+  writeUint16(endView, 8, files.length);
+  writeUint16(endView, 10, files.length);
+  writeUint32(endView, 12, centralSize);
+  writeUint32(endView, 16, localOffset);
+  writeUint16(endView, 20, 0);
+
+  return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
+}
+
+async function downloadA6Zip(system, button) {
+  if (activeResultUrls.length !== 8) {
+    throw new Error(`Expected 8 results, received ${activeResultUrls.length}`);
+  }
+
+  button.textContent = "Preparing ZIP...";
+  const files = await Promise.all(
+    activeResultUrls.map(async (url, index) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Result ${index + 1} download failed: ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size || blob.type.startsWith("text/")) {
+        throw new Error(`Result ${index + 1} is not a valid image`);
+      }
+      const extension = getBlobExtension(blob, url, "image");
+      return {
+        name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
+        blob,
+      };
+    }),
+  );
+
+  const zipBlob = await createStoredZip(files);
+  const filename = `${system.id.toLowerCase()}-architect-ai-8-views.zip`;
+  button.textContent = "Choose location...";
+  const handle = await chooseSaveHandle(filename, "archive", "zip", "application/zip");
+  button.textContent = "Saving ZIP...";
+  await saveBlob(zipBlob, handle);
+}
+
 $("#downloadResult").addEventListener("click", async () => {
   const system = getActiveSystem();
   const button = $("#downloadResult");
+  const defaultLabel = getDownloadButtonLabel(system);
   const filenameBase = `${activeId.toLowerCase()}-architect-ai-result`;
 
   if (system.result === "prompt") {
@@ -1438,14 +1590,39 @@ $("#downloadResult").addEventListener("click", async () => {
             : "Save failed";
     } finally {
       button.disabled = false;
-      window.setTimeout(() => (button.textContent = "Save"), 1800);
+      window.setTimeout(() => (button.textContent = defaultLabel), 1800);
+    }
+    return;
+  }
+
+  if (["A6-1", "A6-2"].includes(system.id)) {
+    if (!activeResultUrls.length) {
+      button.textContent = "No result";
+      window.setTimeout(() => (button.textContent = defaultLabel), 1600);
+      return;
+    }
+
+    button.disabled = true;
+    try {
+      await downloadA6Zip(system, button);
+      button.textContent = "ZIP Saved";
+    } catch (error) {
+      button.textContent =
+        error?.name === "AbortError"
+          ? "Cancelled"
+          : error?.message === "SAVE_PICKER_UNSUPPORTED"
+            ? "Use Edge / Chrome"
+            : "ZIP failed";
+    } finally {
+      button.disabled = false;
+      window.setTimeout(() => (button.textContent = defaultLabel), 2400);
     }
     return;
   }
 
   if (!activeResultUrl) {
     button.textContent = "No result";
-    window.setTimeout(() => (button.textContent = "Save"), 1600);
+    window.setTimeout(() => (button.textContent = defaultLabel), 1600);
     return;
   }
 
@@ -1455,7 +1632,7 @@ $("#downloadResult").addEventListener("click", async () => {
     const blob = await activeResultBlobPromise;
     button.disabled = false;
     button.textContent = blob?.size ? "Ready - click Save" : "Save failed";
-    window.setTimeout(() => (button.textContent = "Save"), 2400);
+    window.setTimeout(() => (button.textContent = defaultLabel), 2400);
     return;
   }
 
@@ -1485,7 +1662,7 @@ $("#downloadResult").addEventListener("click", async () => {
           : "Save failed";
   } finally {
     button.disabled = false;
-    window.setTimeout(() => (button.textContent = "Save"), 1800);
+    window.setTimeout(() => (button.textContent = defaultLabel), 1800);
   }
 });
 
