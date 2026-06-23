@@ -1,9 +1,10 @@
 const systems = [
   {
-    id: "A1",
-    title: "Prompt Basic",
-    subtitle: "真實圖轉建築提示詞",
-    desc: "上傳真實建築照片或渲染圖，快速萃取建築風格、立面、材質與構圖語彙。",
+    id: "A1-1",
+    activeTitle: "A1-1｜AI Visual Prompt",
+    title: "AI Visual Prompt",
+    subtitle: "圖形辨識AI提詞－白話文",
+    desc: "上傳圖形，由 AI 辨識內容並產生容易理解、可直接使用的白話文提示詞。",
     tier: "Free",
     status: "Live System",
     result: "prompt",
@@ -12,16 +13,43 @@ const systems = [
     prompt: false,
   },
   {
-    id: "A2",
-    title: "Prompt Precision",
-    subtitle: "精準建築提示詞",
-    desc: "針對真實建築照片進行更精準的語彙整理，輸出可直接用於後續視覺生成的關鍵字。",
+    id: "A1-2",
+    activeTitle: "A1-2｜AI Visual Prompt",
+    title: "AI Visual Prompt",
+    subtitle: "圖形辨識AI提詞－文言文",
+    desc: "上傳圖形，由 AI 辨識內容並轉化為精煉的文言文提示詞。",
     tier: "Free",
     status: "Live System",
     result: "prompt",
     inputs: [{ key: "building", label: "真實建築照片 / 渲染參考圖" }],
     count: false,
     prompt: false,
+  },
+  {
+    id: "A2-1",
+    activeTitle: "A2-1｜One-Click Rendering",
+    title: "One-Click Rendering",
+    subtitle: "一鍵渲染透視",
+    desc: "將手繪圖或 3D 線稿一鍵轉化為擬真建築透視圖。",
+    tier: "Free",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "image", label: "手繪圖 / 3D 線稿" }],
+    count: true,
+    prompt: false,
+  },
+  {
+    id: "A2-2",
+    activeTitle: "A2-2｜One-Click Rendering",
+    title: "One-Click Rendering",
+    subtitle: "一鍵平面上色",
+    desc: "上傳平面圖線稿並搭配風格類型，轉化為上色平面圖。",
+    tier: "Free",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "image", label: "平面圖線稿" }],
+    count: true,
+    prompt: true,
   },
   {
     id: "A3",
@@ -69,8 +97,8 @@ const systems = [
   {
     id: "A6-1",
     gridDisplayId: "A6",
-    activeTitle: "A6-1｜創意多視角",
-    title: "創意多視角",
+    activeTitle: "A6-1｜Creative Multi-View",
+    title: "Creative Multi-View",
     subtitle: "單張圖AI產生8個視角",
     desc: "上傳一張完成的建築渲染圖，由 AI 快速延伸近景、廣角、左右 45°、左右 90°、鳥瞰與低角度等 8 個透視視角。",
     tier: "Plus",
@@ -82,8 +110,8 @@ const systems = [
   },
   {
     id: "A6-2",
-    activeTitle: "A6-2｜經典多視角",
-    title: "經典多視角",
+    activeTitle: "A6-2｜Creative Multi-View",
+    title: "Creative Multi-View",
     subtitle: "單張圖AI產生8個經典視角",
     desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
     tier: "Plus",
@@ -172,7 +200,44 @@ const systems = [
   },
 ];
 
-let activeId = "A1";
+const gridSystems = [
+  {
+    ...systems.find((system) => system.id === "A1-1"),
+    id: "A1",
+    targetId: "A1-1",
+    title: "AI Visual Prompt",
+    subtitle: "圖形辨識 AI 提詞",
+  },
+  {
+    ...systems.find((system) => system.id === "A2-1"),
+    id: "A2",
+    targetId: "A2-1",
+    title: "One-Click Rendering",
+    subtitle: "一鍵上色 平面圖/透視圖",
+  },
+  systems.find((system) => system.id === "A3"),
+  systems.find((system) => system.id === "A4"),
+  systems.find((system) => system.id === "A5"),
+  {
+    ...systems.find((system) => system.id === "A6-1"),
+    id: "A6",
+    targetId: "A6-1",
+    title: "Creative Multi-View",
+  },
+  systems.find((system) => system.id === "A7"),
+  {
+    ...systems.find((system) => system.id === "A8-1"),
+    id: "A8",
+    targetId: "A8-1",
+  },
+  {
+    ...systems.find((system) => system.id === "A9-1"),
+    id: "A9",
+    targetId: "A9-1",
+  },
+];
+
+let activeId = "A1-1";
 const previews = new Map();
 const uploadedFiles = new Map();
 let activeResultUrl = "";
@@ -341,7 +406,7 @@ function renderUsageList(records = []) {
   const bucketLabels = {
     member_a1_a8_monthly: "A1-A8 本月共用額度",
     member_a9_monthly: "A9 本月額度",
-    anon_a1_a2_daily: "匿名 A1/A2 今日試用額度",
+    anon_a1_a2_daily: "匿名 A1-1/A1-2 今日試用額度",
   };
   usageList.innerHTML = records
     .slice(0, 8)
@@ -761,7 +826,7 @@ function handleAuthCallbackError() {
 }
 
 function requiresMember(system) {
-  return !["A1", "A2"].includes(system.id);
+  return !["A1-1", "A1-2"].includes(system.id);
 }
 
 function getActiveSystem() {
@@ -806,7 +871,7 @@ function systemCard(system) {
   `;
   card.addEventListener("click", () => {
     if (system.status !== "Live System") return;
-    activeId = system.id;
+    activeId = system.targetId || system.id;
     renderApp();
     document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -852,15 +917,30 @@ const A9_PROMPT_PRESETS = {
   orbit: A9_ORBIT_PROMPT,
 };
 
+const A2_FLOOR_PLAN_PROMPT_PRESETS = {
+  custom: "change image 1 to realistic photograph",
+  residential: `change image 1 to realistic photograph, clean professional interior floor plan rendering, top-down orthographic view,
+only the interior area inside the apartment walls is colored and rendered,
+all exterior area outside the apartment boundary is pure clean white paper,
+no background texture, no border texture, no title block rendering,
+realistic interior materials, light oak wood floor, warm gray tiles,
+soft fabric furniture, wood cabinetry, stone countertop,
+subtle shadows, premium interior design presentation,
+preserve original layout, preserve wall lines, clean black linework`,
+};
+
 function textPromptField(system) {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
   const isA9 = system.id === "A9-1";
+  const isA2FloorPlan = system.id === "A2-2";
   wrapper.innerHTML = `
-    <label for="customPrompt">${isA9 ? "影像提示詞" : "建築提示詞"}</label>
+    <label for="customPrompt">${isA9 ? "影像提示詞" : isA2FloorPlan ? "風格與圖形狀況提詞" : "建築提示詞"}</label>
     <textarea id="customPrompt" placeholder="${
       isA9
         ? "描述鏡頭方向、運動方式、光線與動畫氛圍..."
+        : isA2FloorPlan
+          ? "請選擇下方提詞選項，或直接在此編輯內容。"
         : "例如：低樓層集合住宅、清水混凝土、深窗框、街角基地、柔和日光..."
     }"></textarea>
     ${
@@ -875,12 +955,33 @@ function textPromptField(system) {
             <button type="button" disabled>5. 待更新</button>
           </div>
         `
-        : ""
+        : isA2FloorPlan
+          ? `
+          <div class="prompt-presets" aria-label="平面上色提詞預設">
+            <span>提詞預設</span>
+            <button type="button" data-floor-plan-preset="custom">1. 自行提詞</button>
+            <button type="button" data-floor-plan-preset="residential">2. 住宅單元上色</button>
+            <button type="button" disabled>3. 待更新</button>
+            <button type="button" disabled>4. 待更新</button>
+            <button type="button" disabled>5. 待更新</button>
+            <button type="button" disabled>6. 待更新</button>
+            <button type="button" disabled>7. 待更新</button>
+            <button type="button" disabled>8. 待更新</button>
+          </div>
+        `
+          : ""
     }
   `;
   wrapper.querySelectorAll("[data-prompt-preset]").forEach((button) => {
     button.addEventListener("click", () => {
       wrapper.querySelector("#customPrompt").value = A9_PROMPT_PRESETS[button.dataset.promptPreset] || "";
+    });
+  });
+  wrapper.querySelectorAll("[data-floor-plan-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wrapper.querySelector("#customPrompt").value =
+        A2_FLOOR_PLAN_PROMPT_PRESETS[button.dataset.floorPlanPreset] || "";
+      wrapper.querySelector("#customPrompt").focus();
     });
   });
   return wrapper;
@@ -1182,9 +1283,9 @@ function validateInputs(system) {
 
 async function submitRealJob(system) {
   if (requiresMember(system) && !getAuthToken()) {
-    authMessage.textContent = "請先登入會員後再使用 A3-A9。";
+    authMessage.textContent = "請先登入會員後再使用 A2-1～A9。";
     authDialog.showModal();
-    throw new Error("請先登入會員後再使用 A3-A9");
+    throw new Error("請先登入會員後再使用 A2-1～A9");
   }
 
   const validationError = validateInputs(system);
@@ -1273,9 +1374,7 @@ function renderApp() {
   systems.forEach((item) => systemList.append(systemButton(item)));
 
   systemsGrid.innerHTML = "";
-  systems
-    .filter((item) => !["A6-2", "A8-2", "A9-2"].includes(item.id))
-    .forEach((item) => systemsGrid.append(systemCard(item)));
+  gridSystems.forEach((item) => systemsGrid.append(systemCard(item)));
 
   activeTier.textContent = `${system.tier} Access`;
   activeTitle.textContent =
@@ -1812,7 +1911,7 @@ async function signOut() {
   renderUsageList([]);
   renderJobList([]);
   updateAuthUi();
-  if (authMessage) authMessage.textContent = "已登出，A3-A9 需重新登入後使用。";
+  if (authMessage) authMessage.textContent = "已登出，A2-1～A9 需重新登入後使用。";
 }
 
 async function saveProfile(event) {
