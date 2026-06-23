@@ -237,7 +237,20 @@ const gridSystems = [
   },
 ];
 
+const sidebarGroups = [
+  { id: "A1", title: "AI Visual Prompt", childIds: ["A1-1", "A1-2"] },
+  { id: "A2", title: "One-Click Rendering", childIds: ["A2-1", "A2-2"] },
+  { id: "A3", systemId: "A3" },
+  { id: "A4", systemId: "A4" },
+  { id: "A5", systemId: "A5" },
+  { id: "A6", title: "Creative Multi-View", childIds: ["A6-1", "A6-2"] },
+  { id: "A7", systemId: "A7" },
+  { id: "A8", title: "HD Enhance", childIds: ["A8-1", "A8-2"] },
+  { id: "A9", title: "AI Motion Render", childIds: ["A9-1", "A9-2"] },
+];
+
 let activeId = "A1-1";
+let expandedSidebarGroup = null;
 const previews = new Map();
 const uploadedFiles = new Map();
 let activeResultUrl = "";
@@ -833,23 +846,94 @@ function getActiveSystem() {
   return systems.find((system) => system.id === activeId) || systems[0];
 }
 
-function systemButton(system) {
+function getSystem(systemId) {
+  return systems.find((system) => system.id === systemId);
+}
+
+function sidebarGroupContains(group, systemId) {
+  return group.systemId === systemId || group.childIds?.includes(systemId);
+}
+
+function activateSystem(systemId, groupId = null) {
+  const system = getSystem(systemId);
+  if (!system || system.status !== "Live System") return;
+  activeId = system.id;
+  expandedSidebarGroup = groupId;
+  renderApp();
+  document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function systemButton(system, { child = false, groupId = null } = {}) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = `system-button ${system.id === activeId ? "active" : ""}`;
+  button.className = `system-button${child ? " system-child-button" : ""}${system.id === activeId ? " active" : ""}`;
   button.disabled = system.status !== "Live System";
+  button.setAttribute("aria-current", system.id === activeId ? "true" : "false");
   button.innerHTML = `
     <span class="system-id">${system.displayId || system.id}</span>
     <span><strong>${system.title}</strong><small>${system.subtitle}</small></span>
     <span class="tier-chip">${system.tier}</span>
   `;
   button.addEventListener("click", () => {
-    if (system.status !== "Live System") return;
-    activeId = system.id;
-    renderApp();
-    document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+    activateSystem(system.id, groupId);
   });
   return button;
+}
+
+function sidebarGroup(group) {
+  if (group.systemId) {
+    const system = getSystem(group.systemId);
+    if (!system) return document.createDocumentFragment();
+    const row = systemButton(system);
+    row.classList.add("system-group-single");
+    return row;
+  }
+
+  const children = group.childIds.map(getSystem).filter(Boolean);
+  const isExpanded = expandedSidebarGroup === group.id;
+  const hasActiveChild = children.some((system) => system.id === activeId);
+  const groupElement = document.createElement("div");
+  groupElement.className = `system-group${isExpanded ? " expanded" : ""}${hasActiveChild ? " has-active" : ""}`;
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "system-group-toggle";
+  toggle.setAttribute("aria-expanded", String(isExpanded));
+  toggle.setAttribute("aria-controls", `sidebar-${group.id}-children`);
+  toggle.innerHTML = `
+    <span class="system-id">${group.id}</span>
+    <span class="system-group-copy">
+      <strong>${group.title}</strong>
+      <small>${children.length} 個選項</small>
+    </span>
+    <span class="system-group-actions">
+      <span class="tier-chip">${children[0]?.tier || ""}</span>
+      <span class="system-chevron" aria-hidden="true">⌄</span>
+    </span>
+  `;
+  toggle.addEventListener("click", () => {
+    expandedSidebarGroup = isExpanded ? null : group.id;
+    renderSystemList();
+  });
+
+  const childrenRegion = document.createElement("div");
+  childrenRegion.className = "system-group-children";
+  childrenRegion.id = `sidebar-${group.id}-children`;
+  childrenRegion.setAttribute("aria-hidden", String(!isExpanded));
+  childrenRegion.toggleAttribute("inert", !isExpanded);
+  const childrenInner = document.createElement("div");
+  childrenInner.className = "system-group-children-inner";
+  children.forEach((system) => {
+    childrenInner.append(systemButton(system, { child: true, groupId: group.id }));
+  });
+  childrenRegion.append(childrenInner);
+  groupElement.append(toggle, childrenRegion);
+  return groupElement;
+}
+
+function renderSystemList() {
+  systemList.innerHTML = "";
+  sidebarGroups.forEach((group) => systemList.append(sidebarGroup(group)));
 }
 
 function systemCard(system) {
@@ -871,9 +955,9 @@ function systemCard(system) {
   `;
   card.addEventListener("click", () => {
     if (system.status !== "Live System") return;
-    activeId = system.targetId || system.id;
-    renderApp();
-    document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+    const targetId = system.targetId || system.id;
+    const targetGroup = sidebarGroups.find((group) => sidebarGroupContains(group, targetId));
+    activateSystem(targetId, targetGroup?.childIds ? targetGroup.id : null);
   });
   return card;
 }
@@ -1370,8 +1454,7 @@ function simulateGenerate() {
 function renderApp() {
   const system = getActiveSystem();
 
-  systemList.innerHTML = "";
-  systems.forEach((item) => systemList.append(systemButton(item)));
+  renderSystemList();
 
   systemsGrid.innerHTML = "";
   gridSystems.forEach((item) => systemsGrid.append(systemCard(item)));
