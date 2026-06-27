@@ -3,9 +3,9 @@ const systems = [
     id: "A1-1",
     activeTitle: "A1-1｜AI Visual Prompt",
     title: "AI Visual Prompt",
-    subtitle: "圖形辨識AI提詞－白話文",
+    subtitle: "訪客可試用｜圖形辨識AI提詞－白話文",
     desc: "上傳圖形，由 AI 辨識內容並產生容易理解、可直接使用的白話文提示詞。",
-    tier: "Free",
+    tier: "訪客試用",
     status: "Live System",
     result: "prompt",
     inputs: [{ key: "building", label: "真實建築照片 / 渲染參考圖" }],
@@ -16,9 +16,9 @@ const systems = [
     id: "A1-2",
     activeTitle: "A1-2｜AI Visual Prompt",
     title: "AI Visual Prompt",
-    subtitle: "圖形辨識AI提詞－文言文",
+    subtitle: "訪客可試用｜圖形辨識AI提詞－文言文",
     desc: "上傳圖形，由 AI 辨識內容並轉化為精煉的文言文提示詞。",
-    tier: "Free",
+    tier: "訪客試用",
     status: "Live System",
     result: "prompt",
     inputs: [{ key: "building", label: "真實建築照片 / 渲染參考圖" }],
@@ -29,9 +29,9 @@ const systems = [
     id: "A2-1",
     activeTitle: "A2-1｜One-Click Rendering",
     title: "One-Click Rendering",
-    subtitle: "一鍵渲染透視",
+    subtitle: "會員登入後使用｜一鍵渲染透視",
     desc: "將手繪圖或 3D 線稿一鍵轉化為擬真建築透視圖。",
-    tier: "Free",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "image", label: "手繪圖 / 3D 線稿" }],
@@ -42,9 +42,9 @@ const systems = [
     id: "A2-2",
     activeTitle: "A2-2｜One-Click Rendering",
     title: "One-Click Rendering",
-    subtitle: "一鍵平面上色",
+    subtitle: "會員登入後使用｜一鍵平面上色",
     desc: "上傳平面圖線稿並搭配風格類型，轉化為上色平面圖。",
-    tier: "Free",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "image", label: "平面圖線稿" }],
@@ -54,9 +54,9 @@ const systems = [
   {
     id: "A3",
     title: "Sketch Prompt",
-    subtitle: "自行提詞 + Sketch",
+    subtitle: "會員登入後使用｜自行提詞 + Sketch",
     desc: "上傳草圖、3D 量體或基地初稿，搭配自行輸入的建築提示詞產生外觀提案。",
-    tier: "Free",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "sketch", label: "Sketch / 3D 量體圖" }],
@@ -66,9 +66,9 @@ const systems = [
   {
     id: "A4",
     title: "Style Sketch",
-    subtitle: "風格圖 + Sketch",
+    subtitle: "會員登入後使用｜風格圖 + Sketch",
     desc: "以草圖或量體圖為基礎，加入風格參考圖，產生符合指定材質與立面語彙的外觀提案。",
-    tier: "Free",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [
@@ -81,9 +81,9 @@ const systems = [
   {
     id: "A5",
     title: "Style Sketch Site",
-    subtitle: "風格圖 + Sketch + Site",
+    subtitle: "會員登入後使用｜風格圖 + Sketch + Site",
     desc: "整合主建築量體、風格參考與基地周邊關係，產出更貼近提案討論情境的建築外觀圖。",
-    tier: "Free",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [
@@ -99,9 +99,9 @@ const systems = [
     gridDisplayId: "A6",
     activeTitle: "A6-1｜Creative Multi-View",
     title: "Creative Multi-View",
-    subtitle: "單張圖AI產生8個視角",
+    subtitle: "會員登入後使用｜單張圖AI產生8個視角",
     desc: "上傳一張完成的建築渲染圖，由 AI 快速延伸近景、廣角、左右 45°、左右 90°、鳥瞰與低角度等 8 個透視視角。",
-    tier: "Plus",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "building", label: "AI推測建築視角參考圖" }],
@@ -112,9 +112,9 @@ const systems = [
     id: "A6-2",
     activeTitle: "A6-2｜Creative Multi-View",
     title: "Creative Multi-View",
-    subtitle: "單張圖AI產生8個經典視角",
+    subtitle: "會員登入後使用｜單張圖AI產生8個經典視角",
     desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
-    tier: "Plus",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "building", label: "AI推測建築視角參考圖" }],
@@ -124,9 +124,9 @@ const systems = [
   {
     id: "A7",
     title: "Style Sketch Site HD",
-    subtitle: "風格圖 + Sketch + Site + HD",
+    subtitle: "會員登入後使用｜風格圖 + Sketch + Site + HD",
     desc: "將風格、量體與基地整合後輸出高解析提案圖。",
-    tier: "Plus",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [
@@ -141,9 +141,9 @@ const systems = [
     id: "A8-1",
     gridDisplayId: "A8",
     title: "HD Enhance",
-    subtitle: "建築圖片快速高畫質放大",
+    subtitle: "會員登入後使用｜建築圖片快速高畫質放大",
     desc: "使用AI推算直接放大圖形解析度，適合一般高解析輸出。",
-    tier: "Pro",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "building", label: "待增強建築圖片" }],
@@ -154,9 +154,9 @@ const systems = [
     id: "A8-2",
     activeTitle: "A8-2 Rerender",
     title: "Rerender",
-    subtitle: "AI自動判斷重繪",
+    subtitle: "會員登入後使用｜AI自動判斷重繪",
     desc: "使用 AI 判斷重新演算繪圖，強化材質、紋理與細節，亦適合模糊圖片轉為高品質。",
-    tier: "Pro",
+    tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [{ key: "building", label: "待重繪建築圖片" }],
@@ -168,9 +168,9 @@ const systems = [
     gridDisplayId: "A9",
     activeTitle: "A9-1｜AI Motion Render",
     title: "AI Motion Render",
-    subtitle: "單張圖像轉 AI 建築動畫",
+    subtitle: "會員登入後使用｜單張圖像轉 AI 建築動畫",
     desc: "上傳 1 張建築圖像並選擇鏡頭提示詞，生成具有運鏡效果的 AI 動畫影片。",
-    tier: "Pro",
+    tier: "會員",
     status: "Live System",
     result: "video",
     inputs: [{ key: "image", label: "建築圖像 / Render" }],
@@ -179,11 +179,11 @@ const systems = [
   },
   {
     id: "A9-2",
-    activeTitle: "A9_V2｜AI Motion Render",
+    activeTitle: "A9-2｜AI Motion Render",
     title: "AI Motion Render",
-    subtitle: "7 張關鍵圖像轉 AI 動畫",
+    subtitle: "會員登入後使用｜7 張關鍵圖像轉 AI 動畫",
     desc: "依序上傳 7 張關鍵圖像，等待約 10 分鐘生成一段 AI 動畫影片。適用於施工動畫模擬、立面表情轉換與室內場景變化。",
-    tier: "Pro",
+    tier: "會員",
     status: "Live System",
     result: "video",
     inputs: [
@@ -206,14 +206,14 @@ const gridSystems = [
     id: "A1",
     targetId: "A1-1",
     title: "AI Visual Prompt",
-    subtitle: "圖形辨識 AI 提詞",
+    subtitle: "訪客可試用的圖像提詞",
   },
   {
     ...systems.find((system) => system.id === "A2-1"),
     id: "A2",
     targetId: "A2-1",
     title: "One-Click Rendering",
-    subtitle: "一鍵上色 平面圖/透視圖",
+    subtitle: "會員登入後一鍵生成",
   },
   systems.find((system) => system.id === "A3"),
   systems.find((system) => system.id === "A4"),
@@ -258,6 +258,7 @@ let activeResultType = "";
 let activeResultBlob = null;
 let activeResultBlobPromise = null;
 let activeResultUrls = [];
+let isHowToUseOpen = false;
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -272,6 +273,11 @@ const promptOutput = $("#promptOutput");
 const renderOutput = $("#renderOutput");
 const mainPreview = $("#mainPreview");
 const thumbGrid = $("#thumbGrid");
+const howToUseButton = $("#howToUseButton");
+const howToUsePopover = $("#howToUsePopover");
+const howToUseImage = $("#howToUseImage");
+const howToUseTitle = $("#howToUseTitle");
+const howToUseClose = $("#howToUseClose");
 const authButton = $("#authButton");
 const adminButton = $("#adminButton");
 const memberAdminButton = $("#memberAdminButton");
@@ -859,6 +865,7 @@ function activateSystem(systemId, groupId = null) {
   if (!system || system.status !== "Live System") return;
   activeId = system.id;
   expandedSidebarGroup = groupId;
+  isHowToUseOpen = false;
   renderApp();
   document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -867,6 +874,7 @@ function systemButton(system, { child = false, groupId = null } = {}) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `system-button${child ? " system-child-button" : ""}${system.id === activeId ? " active" : ""}`;
+  button.dataset.systemId = system.id;
   button.disabled = system.status !== "Live System";
   button.setAttribute("aria-current", system.id === activeId ? "true" : "false");
   button.innerHTML = `
@@ -898,6 +906,7 @@ function sidebarGroup(group) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "system-group-toggle";
+  toggle.dataset.groupId = group.id;
   toggle.setAttribute("aria-expanded", String(isExpanded));
   toggle.setAttribute("aria-controls", `sidebar-${group.id}-children`);
   toggle.innerHTML = `
@@ -1013,6 +1022,23 @@ subtle shadows, premium interior design presentation,
 preserve original layout, preserve wall lines, clean black linework`,
 };
 
+const OPERATION_GUIDES = {
+  "A1-1": "./assets/operation-guides/A1-1.jpg",
+  "A1-2": "./assets/operation-guides/A1-2.jpg",
+  "A2-1": "./assets/operation-guides/A2-1.jpg",
+  "A2-2": "./assets/operation-guides/A2-2.jpg",
+  A3: "./assets/operation-guides/A3.jpg",
+  A4: "./assets/operation-guides/A4.jpg",
+  A5: "./assets/operation-guides/A5.jpg",
+  "A6-1": "./assets/operation-guides/A6-1.jpg",
+  "A6-2": "./assets/operation-guides/A6-2.jpg",
+  A7: "./assets/operation-guides/A7.jpg",
+  "A8-1": "./assets/operation-guides/A8-1.jpg",
+  "A8-2": "./assets/operation-guides/A8-2.jpg",
+  "A9-1": "./assets/operation-guides/A9-1.jpg",
+  "A9-2": "./assets/operation-guides/A9-2.jpg",
+};
+
 function textPromptField(system) {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
@@ -1082,6 +1108,33 @@ function countField() {
     </select>
   `;
   return wrapper;
+}
+
+function renderHowToUse(system) {
+  if (!howToUseButton || !howToUsePopover || !howToUseImage || !howToUseTitle) return;
+
+  const guideSrc = OPERATION_GUIDES[system.id];
+  const isVisible = Boolean(guideSrc && isHowToUseOpen);
+  howToUseButton.hidden = !guideSrc;
+  howToUseButton.setAttribute("aria-expanded", String(isVisible));
+  howToUseButton.setAttribute("aria-pressed", String(isVisible));
+  howToUsePopover.hidden = !isVisible;
+  const toolHeader = document.querySelector(".tool-header");
+  if (toolHeader) {
+    howToUsePopover.style.setProperty("--how-to-popover-top", `${toolHeader.offsetTop + toolHeader.offsetHeight + 8}px`);
+  }
+
+  if (!guideSrc) return;
+
+  const guideTitle = `${system.id} How To Use / 如何使用`;
+  howToUseTitle.textContent = guideTitle;
+  howToUseImage.src = guideSrc;
+  howToUseImage.alt = guideTitle;
+}
+
+function toggleHowToUse() {
+  isHowToUseOpen = !isHowToUseOpen;
+  renderHowToUse(getActiveSystem());
 }
 
 function renderInputs(system) {
@@ -1367,9 +1420,9 @@ function validateInputs(system) {
 
 async function submitRealJob(system) {
   if (requiresMember(system) && !getAuthToken()) {
-    authMessage.textContent = "請先登入會員後再使用 A2-1～A9。";
+    authMessage.textContent = "請先登入會員後再使用 A2-1～A9。A1-1／A1-2 可免登入試用。";
     authDialog.showModal();
-    throw new Error("請先登入會員後再使用 A2-1～A9");
+    throw new Error("請先登入會員後再使用 A2-1～A9。A1-1／A1-2 可免登入試用。");
   }
 
   const validationError = validateInputs(system);
@@ -1468,6 +1521,7 @@ function renderApp() {
 
   renderInputs(system);
   renderResult(system);
+  renderHowToUse(system);
 }
 
 async function convertImageBlobToPng(blob) {
@@ -2032,6 +2086,21 @@ authRegister?.addEventListener("click", registerWithEmail);
 authReset?.addEventListener("click", resetPassword);
 authGoogle?.addEventListener("click", loginWithGoogle);
 authSignOut?.addEventListener("click", signOut);
+howToUseButton?.addEventListener("click", toggleHowToUse);
+howToUseClose?.addEventListener("click", () => {
+  isHowToUseOpen = false;
+  renderHowToUse(getActiveSystem());
+});
+howToUsePopover?.addEventListener("click", (event) => {
+  if (event.target !== howToUsePopover) return;
+  isHowToUseOpen = false;
+  renderHowToUse(getActiveSystem());
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !isHowToUseOpen) return;
+  isHowToUseOpen = false;
+  renderHowToUse(getActiveSystem());
+});
 async function openAdminDialog() {
   adminDialog?.showModal();
   await loadAdminDashboard();

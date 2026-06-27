@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ARCHITECT AI SYSTEM | AI 建築快速渲染平台</title>
+    <title>ARCHITECT AI SYSTEM | AI 建築提案生成平台</title>
     <meta
       name="description"
-      content="專為建築師、設計公司、建商與代銷打造的 AI 建築快速渲染平台。上傳量體、草圖、風格與基地照片，快速產出建築提案圖。"
+      content="專為建築師、設計公司、建商與代銷打造的 AI 建築提案生成平台。上傳量體、草圖、風格與基地照片，快速產出外觀渲染、平面上色、多視角與動畫提案素材。"
     />
     <meta property="og:title" content="ARCHITECT AI SYSTEM" />
-    <meta property="og:description" content="AI 建築快速渲染平台封閉測試版。" />
+    <meta property="og:description" content="從草圖、量體與基地照片快速生成建築提案素材的 AI 平台。" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="./assets/hero-system.png" />
     <meta name="theme-color" content="#050711" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=accordion-nav-20260623-1" />
+    <link rel="stylesheet" href="./styles.css?v=how-to-fit-20260628" />
   </head>
   <body>
     <div class="site-shell">
@@ -23,7 +23,7 @@
           <span class="brand-mark">A</span>
           <span>
             <strong>ARCHITECT AI SYSTEM</strong>
-            <small>AI 建築快速渲染平台</small>
+            <small>AI 建築提案生成平台</small>
           </span>
         </a>
 
@@ -55,24 +55,24 @@
             <h1>ARCHITECT AI SYSTEM</h1>
             <p class="eyebrow"><span></span> AI Architectural Visualization Platform</p>
             <div class="hero-lead">
-              <p><strong>AI協同作業</strong> - 建築概念設計階段，透過AI快速產出多選項外觀方案，降低人工負擔。</p>
-              <p><strong>可掌握的建築AI渲染圖</strong> - 保持建築輪廓，加入風格圖/提詞等功能變數。</p>
-              <p><strong>專業建築師自行開發系統</strong> - 結合市場實際操作經驗，自行建構AI建築視覺化系統。</p>
+              <p><strong>概念提案加速</strong> - 從草圖、量體、基地照片到風格參考，快速產出可討論的建築外觀方案。</p>
+              <p><strong>建築輪廓可控</strong> - 保留設計主體與比例關係，再加入材質、立面語彙、平面上色與動畫運鏡。</p>
+              <p><strong>為建築工作流打造</strong> - 由建築實務需求出發，協助設計團隊在早期階段比較更多方案。</p>
             </div>
           </div>
 
           <div class="metrics" aria-label="平台重點">
             <button class="metric-card" type="button" data-scroll-target="systems" aria-label="查看 A1-A9 生成系統架構">
               <strong>9</strong>
-              <span>AI 生成系統</span>
+              <span>A1-A9 生成模組</span>
             </button>
             <div>
               <strong>1 / 6</strong>
-              <span>單張測試或多方案輸出</span>
+              <span>單張測試到多方案提案</span>
             </div>
             <div>
               <strong>HD</strong>
-              <span>高解析方案規劃</span>
+              <span>渲染、放大與動畫輸出</span>
             </div>
           </div>
         </section>
@@ -80,8 +80,8 @@
         <section class="systems-section" id="systems">
           <div class="section-heading">
             <p class="eyebrow"><span></span> AI Systems</p>
-            <h2>A1-A9 生成系統</h2>
-            <p>依草圖、風格、基地、提示詞等資料，進行個別渲染、融合渲染到動畫輸出，依會員等級逐步開放。</p>
+            <h2>A1-A9 建築提案模組</h2>
+            <p>依照不同設計階段選擇模組：從圖像提詞、一鍵渲染、風格融合、多視角、高畫質放大到 AI 動畫輸出。</p>
           </div>
           <div class="systems-grid" id="systemsGrid"></div>
         </section>
@@ -89,9 +89,9 @@
         <section class="workspace-section" id="workspace">
           <div class="section-heading">
             <p class="eyebrow"><span></span> Live Prototype</p>
-            <h2>AI 生成系統項目</h2>
+            <h2>選擇模組，上傳素材，取得成果</h2>
             <p>
-              先選擇生成系統➜上傳對應素材➜取得成果。這裡展示各系統介面，後續可串接會員、任務排程與專屬 AI 渲染引擎。
+              A1-1／A1-2 可免登入試用；A2-1～A9 需登入會員後送出任務。登入後可查看用量、任務紀錄與推廣期額度。
             </p>
           </div>
 
@@ -105,7 +105,18 @@
                   <h3 id="activeTitle">A1 Prompt Basic</h3>
                   <p id="activeDesc">由建築量體圖判斷空間特徵，產生可延伸的英文建築提示詞。</p>
                 </div>
-                <span class="status-pill" id="activeStatus">Live System</span>
+                <div class="tool-status-actions">
+                  <span class="status-pill" id="activeStatus">Live System</span>
+                  <button
+                    class="how-to-toggle"
+                    id="howToUseButton"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="howToUsePopover"
+                  >
+                    How To Use / 如何使用
+                  </button>
+                </div>
               </div>
 
               <div class="tool-body">
@@ -135,6 +146,21 @@
                   </div>
                 </div>
               </div>
+
+              <div class="how-to-popover" id="howToUsePopover" hidden>
+                <div class="how-to-card" role="dialog" aria-modal="false" aria-labelledby="howToUseTitle">
+                  <div class="how-to-card-header">
+                    <div>
+                      <p class="panel-kicker">How To Use / 如何使用</p>
+                      <h4 id="howToUseTitle">Operation Guide</h4>
+                    </div>
+                    <button class="icon-button" id="howToUseClose" type="button">Close</button>
+                  </div>
+                  <div class="how-to-image-frame">
+                    <img id="howToUseImage" alt="How To Use guide" />
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </section>
@@ -142,7 +168,7 @@
         <section class="process-section" id="process">
           <div class="section-heading">
             <p class="eyebrow"><span></span> From Concept to Proposal, Faster</p>
-            <h2>優化提案效率</h2>
+            <h2>把早期提案從單一路線變成多方案比較</h2>
           </div>
 
           <div class="process-table">
@@ -174,12 +200,12 @@
                 <div class="process-time">1-3天</div>
                 <div class="process-time">1天</div>
                 <div class="process-time">
-                  <span>6個方案，6分鐘</span>
-                  <span>自己使用草圖＋參考圖，直接生成渲染圖（A5 不用排單時）</span>
+                  <span>6個方案，快速產出</span>
+                  <span>以草圖、參考圖與基地資料生成可討論的渲染方向</span>
                   <span>再選擇方案放入 A9，</span>
-                  <span>6分鐘生成動畫</span>
+                  <span>延伸為 AI 動畫提案</span>
                 </div>
-                <strong class="process-note process-note-strong">大幅度降低工時，提升事務所效率</strong>
+                <strong class="process-note process-note-strong">降低早期視覺化等待時間，讓設計討論更快進入比較與決策</strong>
               </div>
             </div>
           </div>
@@ -188,18 +214,18 @@
         <section class="pricing-section" id="pricing">
           <div class="section-heading">
             <p class="eyebrow"><span></span> Membership</p>
-            <h2>推廣期會員額度</h2>
-            <p>目前所有註冊會員皆可免費使用。正式收費方案開始前，會另行公告並更新會員權益。</p>
+            <h2>推廣期使用額度</h2>
+            <p>A1-1／A1-2 提供訪客每日試用；登入會員後可使用 A1-A9 推廣期免費額度。正式收費方案開始前會另行公告。</p>
           </div>
 
           <div class="pricing-grid">
             <article class="price-card">
               <h3>訪客試用</h3>
-              <p>無需註冊即可體驗 A1-1／A1-2</p>
+              <p>快速體驗圖像提詞，不需先建立帳號</p>
               <strong>免費</strong>
               <ul>
                 <li>A1-1／A1-2 每日共用 3 次</li>
-                <li>依 IP 與瀏覽器識別判斷</li>
+                <li>系統依 IP 與瀏覽器識別判斷</li>
                 <li>註冊後開放完整會員額度</li>
               </ul>
               <button type="button" data-open-auth>建立帳號</button>
@@ -207,7 +233,7 @@
 
             <article class="price-card featured">
               <h3>註冊會員</h3>
-              <p>推廣期間免費使用各項功能</p>
+              <p>登入後可送出 A2-1～A9 任務並查看用量</p>
               <p class="badge">目前推廣方案</p>
               <strong>免費</strong>
               <ul>
@@ -235,44 +261,44 @@
         <section class="pricing-section" id="pricing-legacy" hidden>
           <div class="section-heading">
             <p class="eyebrow"><span></span> Membership</p>
-            <h2>會員方案</h2>
-            <p>先以功能範圍與月用量定義產品價值，正式價格可在封閉測試後依 GPU 成本調整。</p>
+            <h2>推廣期使用額度</h2>
+            <p>A1-1／A1-2 提供訪客每日試用；登入會員後可使用 A1-A9 推廣期免費額度。</p>
           </div>
 
           <div class="pricing-grid">
             <article class="price-card">
-              <h3>Free</h3>
-              <p>A1-A5 入門測試</p>
+              <h3>訪客試用</h3>
+              <p>快速體驗圖像提詞，不需先建立帳號</p>
               <strong>免費</strong>
               <ul>
-                <li>每月各功能 3 次</li>
-                <li>每次輸出 1 張</li>
-                <li>適合試用與系統評估</li>
+                <li>A1-1／A1-2 每日共用 3 次</li>
+                <li>系統依 IP 與瀏覽器識別判斷</li>
+                <li>註冊後開放完整會員額度</li>
               </ul>
               <button type="button" data-open-auth>建立帳號</button>
             </article>
 
             <article class="price-card featured">
-              <h3>Plus</h3>
-              <p>A1-A7 完整提案工具</p>
-              <p class="badge">建議首發主力</p>
-              <strong>月費制</strong>
+              <h3>註冊會員</h3>
+              <p>登入後可送出 A2-1～A9 任務並查看用量</p>
+              <p class="badge">目前推廣方案</p>
+              <strong>免費</strong>
               <ul>
-                <li>每月 60 張</li>
-                <li>開放基地整合與 HD 流程</li>
-                <li>適合建築師與設計工作室</li>
+                <li>A1-A8 每月共用 15 次</li>
+                <li>A9 每月 3 次</li>
+                <li>每次送出任務計為 1 次</li>
               </ul>
-              <button type="button" data-open-auth>加入 Plus</button>
+              <button type="button" data-open-auth>會員登入</button>
             </article>
 
             <article class="price-card">
-              <h3>Pro / Ultra</h3>
-              <p>商業大量生成與動畫</p>
-              <strong>洽談</strong>
+              <h3>額外使用需求</h3>
+              <p>由管理員協助開通追加額度</p>
+              <strong>聯絡管理員</strong>
               <ul>
-                <li>A8-1 HD Enhance 與 A8-2 Rerender</li>
-                <li>A9 建築動畫輸出</li>
-                <li>適合建商、代銷與大型團隊</li>
+                <li>A1-A8 每次開通增加 50 次</li>
+                <li>A9 每次開通增加 5 次</li>
+                <li>正式收費方案將另行公告</li>
               </ul>
               <a href="#contact" data-open-contact>聯絡我們</a>
             </article>
@@ -389,7 +415,7 @@
         <p class="eyebrow"><span></span> Member Access</p>
         <h2>會員登入</h2>
         <div class="auth-form-panel" id="authFormPanel">
-          <p>A1-1／A1-2 每日可免登入試用 3 次；註冊會員可使用 A1-A9 的推廣期免費額度。</p>
+          <p>A1-1／A1-2 每日可免登入試用 3 次；A2-1～A9 需登入會員後送出任務。註冊會員可使用推廣期免費額度。</p>
           <label>
             Email
             <input id="authEmail" type="email" placeholder="your@email.com" />
@@ -508,6 +534,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=member-usage-20260604"></script>
-    <script src="./app.js?v=accordion-labels-20260623-2"></script>
+    <script src="./app.js?v=home-copy-access-20260628"></script>
   </body>
 </html>

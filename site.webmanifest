@@ -1,7 +1,7 @@
 {
   "name": "ARCHITECT AI SYSTEM",
   "short_name": "Architect AI",
-  "description": "AI 建築快速渲染平台",
+  "description": "AI 建築提案生成平台",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050711",
