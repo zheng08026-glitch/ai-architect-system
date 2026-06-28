@@ -238,7 +238,7 @@ const gridSystems = [
 ];
 
 const sidebarGroups = [
-  { id: "A1", title: "AI Visual Prompt", summary: "AI提詞2個項目", childIds: ["A1-1", "A1-2"] },
+  { id: "A1", title: "AI Visual Prompt", summary: "AI提詞", childIds: ["A1-1", "A1-2"] },
   { id: "A2", title: "One-Click Rendering", summary: "一鍵渲染", childIds: ["A2-1", "A2-2"] },
   { id: "A3", systemId: "A3" },
   { id: "A4", systemId: "A4" },
