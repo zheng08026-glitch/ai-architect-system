@@ -29,7 +29,7 @@ const systems = [
     id: "A2-1",
     activeTitle: "A2-1｜One-Click Rendering",
     title: "One-Click Rendering",
-    subtitle: "會員登入後使用｜一鍵渲染透視",
+    subtitle: "一鍵渲染透視",
     desc: "將手繪圖或 3D 線稿一鍵轉化為擬真建築透視圖。",
     tier: "會員",
     status: "Live System",
@@ -42,7 +42,7 @@ const systems = [
     id: "A2-2",
     activeTitle: "A2-2｜One-Click Rendering",
     title: "One-Click Rendering",
-    subtitle: "會員登入後使用｜一鍵平面上色",
+    subtitle: "一鍵平面上色",
     desc: "上傳平面圖線稿並搭配風格類型，轉化為上色平面圖。",
     tier: "會員",
     status: "Live System",
@@ -54,7 +54,7 @@ const systems = [
   {
     id: "A3",
     title: "Sketch Prompt",
-    subtitle: "會員登入後使用｜自行提詞 + Sketch",
+    subtitle: "自行提詞 + Sketch",
     desc: "上傳草圖、3D 量體或基地初稿，搭配自行輸入的建築提示詞產生外觀提案。",
     tier: "會員",
     status: "Live System",
@@ -66,7 +66,7 @@ const systems = [
   {
     id: "A4",
     title: "Style Sketch",
-    subtitle: "會員登入後使用｜風格圖 + Sketch",
+    subtitle: "風格圖 + Sketch",
     desc: "以草圖或量體圖為基礎，加入風格參考圖，產生符合指定材質與立面語彙的外觀提案。",
     tier: "會員",
     status: "Live System",
@@ -81,7 +81,7 @@ const systems = [
   {
     id: "A5",
     title: "Style Sketch Site",
-    subtitle: "會員登入後使用｜風格圖 + Sketch + Site",
+    subtitle: "風格圖 + Sketch + Site",
     desc: "整合主建築量體、風格參考與基地周邊關係，產出更貼近提案討論情境的建築外觀圖。",
     tier: "會員",
     status: "Live System",
@@ -99,7 +99,7 @@ const systems = [
     gridDisplayId: "A6",
     activeTitle: "A6-1｜Creative Multi-View",
     title: "Creative Multi-View",
-    subtitle: "會員登入後使用｜單張圖AI產生8個視角",
+    subtitle: "單張圖AI產生8個視角",
     desc: "上傳一張完成的建築渲染圖，由 AI 快速延伸近景、廣角、左右 45°、左右 90°、鳥瞰與低角度等 8 個透視視角。",
     tier: "會員",
     status: "Live System",
@@ -112,7 +112,7 @@ const systems = [
     id: "A6-2",
     activeTitle: "A6-2｜Creative Multi-View",
     title: "Creative Multi-View",
-    subtitle: "會員登入後使用｜單張圖AI產生8個經典視角",
+    subtitle: "單張圖AI產生8個經典視角",
     desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
     tier: "會員",
     status: "Live System",
@@ -124,7 +124,7 @@ const systems = [
   {
     id: "A7",
     title: "Style Sketch Site HD",
-    subtitle: "會員登入後使用｜風格圖 + Sketch + Site + HD",
+    subtitle: "風格圖 + Sketch + Site + HD",
     desc: "將風格、量體與基地整合後輸出高解析提案圖。",
     tier: "會員",
     status: "Live System",
@@ -141,7 +141,7 @@ const systems = [
     id: "A8-1",
     gridDisplayId: "A8",
     title: "HD Enhance",
-    subtitle: "會員登入後使用｜建築圖片快速高畫質放大",
+    subtitle: "建築圖片快速高畫質放大",
     desc: "使用AI推算直接放大圖形解析度，適合一般高解析輸出。",
     tier: "會員",
     status: "Live System",
@@ -154,7 +154,7 @@ const systems = [
     id: "A8-2",
     activeTitle: "A8-2 Rerender",
     title: "Rerender",
-    subtitle: "會員登入後使用｜AI自動判斷重繪",
+    subtitle: "AI自動判斷重繪",
     desc: "使用 AI 判斷重新演算繪圖，強化材質、紋理與細節，亦適合模糊圖片轉為高品質。",
     tier: "會員",
     status: "Live System",
@@ -168,7 +168,7 @@ const systems = [
     gridDisplayId: "A9",
     activeTitle: "A9-1｜AI Motion Render",
     title: "AI Motion Render",
-    subtitle: "會員登入後使用｜單張圖像轉 AI 建築動畫",
+    subtitle: "單張圖像轉 AI 建築動畫",
     desc: "上傳 1 張建築圖像並選擇鏡頭提示詞，生成具有運鏡效果的 AI 動畫影片。",
     tier: "會員",
     status: "Live System",
@@ -181,7 +181,7 @@ const systems = [
     id: "A9-2",
     activeTitle: "A9-2｜AI Motion Render",
     title: "AI Motion Render",
-    subtitle: "會員登入後使用｜7 張關鍵圖像轉 AI 動畫",
+    subtitle: "7 張關鍵圖像轉 AI 動畫",
     desc: "依序上傳 7 張關鍵圖像，等待約 10 分鐘生成一段 AI 動畫影片。適用於施工動畫模擬、立面表情轉換與室內場景變化。",
     tier: "會員",
     status: "Live System",
@@ -1020,6 +1020,111 @@ realistic interior materials, light oak wood floor, warm gray tiles,
 soft fabric furniture, wood cabinetry, stone countertop,
 subtle shadows, premium interior design presentation,
 preserve original layout, preserve wall lines, clean black linework`,
+  multifamilyRealMaterial: `Transform this architectural CAD floor plan into a fully colored presentation floor plan.
+
+Preserve the original layout exactly.
+Do not change walls, doors, windows, room sizes, furniture positions, circulation, or dimensions.
+
+Apply realistic architectural materials only.
+
+Materials:
+- light oak wood flooring
+- polished concrete flooring
+- marble tiles
+- ceramic tiles in bathrooms
+- white painted walls
+- wood cabinetry
+- natural stone countertops
+- glass partitions
+- realistic furniture textures
+- indoor plants
+
+Professional architectural presentation.
+Top-down orthographic view.
+Realistic lighting.
+Clean shadows.
+High resolution.
+Ultra detailed.
+Modern residential interior.
+Photorealistic material rendering.
+Warm walnut wood.
+Travertine stone.
+Large porcelain slabs.
+Brushed brass.
+Premium kitchen.
+Designer furniture.
+Luxury residence.`,
+  officeRealMaterial: `Transform this architectural CAD floor plan into a fully colored presentation floor plan.
+
+Preserve the original layout exactly.
+Do not change walls, doors, windows, room sizes, furniture positions, circulation, or dimensions.
+
+Apply realistic architectural materials only.
+
+Materials:
+- light oak wood flooring
+- polished concrete flooring
+- marble tiles
+- ceramic tiles in bathrooms
+- white painted walls
+- wood cabinetry
+- natural stone countertops
+- glass partitions
+- realistic furniture textures
+- indoor plants
+
+Professional architectural presentation.
+Top-down orthographic view.
+Realistic lighting.
+Clean shadows.
+High resolution.
+Ultra detailed.
+Modern residential interior.
+Photorealistic material rendering.
+Commercial office floor plan.
+Carpet tiles.
+Glass meeting rooms.
+Concrete flooring.
+Modern workstation.
+Minimal office furniture.
+Corporate design.`,
+  architecturalWatercolor: `Transform this architectural CAD floor plan into a professional architectural watercolor presentation.
+Keep the original floor plan exactly unchanged.
+Do not modify walls, doors, windows, furniture, room layout or geometry.
+Apply watercolor rendering only.
+Soft watercolor wash.
+Transparent watercolor layers.
+Natural pigment texture.
+Subtle color bleeding.
+Hand painted architectural illustration.
+Warm earth tone palette.
+Soft shadows.
+Professional architectural presentation.
+Top-down orthographic view.
+High quality.
+Architectural watercolor rendering.
+Minimal ink outlines.
+Light brush strokes.
+Architectural competition board style.
+Elegant presentation.
+Hand painted texture.`,
+  japaneseWatercolor: `Japanese architectural watercolor.
+Soft pastel color palette.
+Minimal rendering.
+Natural watercolor texture.
+Light ink outlines.
+Elegant composition.
+Muji aesthetic.
+Warm atmosphere.
+Architectural illustration.`,
+  nordicWatercolor: `Scandinavian architectural illustration.
+Muted colors.
+Soft watercolor.
+Natural oak.
+Light concrete.
+Minimal furniture.
+Elegant presentation.
+Nordic design.`,
 };
 
 const OPERATION_GUIDES = {
@@ -1069,13 +1174,13 @@ function textPromptField(system) {
           ? `
           <div class="prompt-presets" aria-label="平面上色提詞預設">
             <span>提詞預設</span>
-            <button type="button" data-floor-plan-preset="custom">1. 自行提詞</button>
-            <button type="button" data-floor-plan-preset="residential">2. 住宅單元上色</button>
-            <button type="button" disabled>3. 待更新</button>
-            <button type="button" disabled>4. 待更新</button>
-            <button type="button" disabled>5. 待更新</button>
-            <button type="button" disabled>6. 待更新</button>
-            <button type="button" disabled>7. 待更新</button>
+            <button type="button" data-floor-plan-preset="custom">1.自行提詞</button>
+            <button type="button" data-floor-plan-preset="residential">2.住宅單元上色</button>
+            <button type="button" data-floor-plan-preset="multifamilyRealMaterial">3.集合住宅-真實材質</button>
+            <button type="button" data-floor-plan-preset="officeRealMaterial">4.商辦-真實材質</button>
+            <button type="button" data-floor-plan-preset="architecturalWatercolor">5.建築水彩風格</button>
+            <button type="button" data-floor-plan-preset="japaneseWatercolor">6.日系建築水彩</button>
+            <button type="button" data-floor-plan-preset="nordicWatercolor">7.北歐風水彩</button>
             <button type="button" disabled>8. 待更新</button>
           </div>
         `
