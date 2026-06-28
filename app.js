@@ -206,14 +206,14 @@ const gridSystems = [
     id: "A1",
     targetId: "A1-1",
     title: "AI Visual Prompt",
-    subtitle: "訪客可試用的圖像提詞",
+    subtitle: "圖像提詞",
   },
   {
     ...systems.find((system) => system.id === "A2-1"),
     id: "A2",
     targetId: "A2-1",
     title: "One-Click Rendering",
-    subtitle: "會員登入後一鍵生成",
+    subtitle: "一鍵渲染透視、平面",
   },
   systems.find((system) => system.id === "A3"),
   systems.find((system) => system.id === "A4"),
@@ -239,14 +239,14 @@ const gridSystems = [
 
 const sidebarGroups = [
   { id: "A1", title: "AI Visual Prompt", summary: "AI提詞2個項目", childIds: ["A1-1", "A1-2"] },
-  { id: "A2", title: "One-Click Rendering", summary: "一鍵渲染2個項目", childIds: ["A2-1", "A2-2"] },
+  { id: "A2", title: "One-Click Rendering", summary: "一鍵渲染", childIds: ["A2-1", "A2-2"] },
   { id: "A3", systemId: "A3" },
   { id: "A4", systemId: "A4" },
   { id: "A5", systemId: "A5" },
-  { id: "A6", title: "Creative Multi-View", summary: "多角度透視2個項目", childIds: ["A6-1", "A6-2"] },
+  { id: "A6", title: "Creative Multi-View", summary: "多角度透視", childIds: ["A6-1", "A6-2"] },
   { id: "A7", systemId: "A7" },
-  { id: "A8", title: "HD Enhance", summary: "提升畫質2個項目", childIds: ["A8-1", "A8-2"] },
-  { id: "A9", title: "AI Motion Render", summary: "AI動畫模擬2個項目", childIds: ["A9-1", "A9-2"] },
+  { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
+  { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2"] },
 ];
 
 let activeId = "A1-1";
