@@ -259,6 +259,13 @@ let activeResultBlob = null;
 let activeResultBlobPromise = null;
 let activeResultUrls = [];
 let isHowToUseOpen = false;
+const MULTI_IMAGE_ZIP_SYSTEM_IDS = new Set(["A6-1", "A6-2"]);
+const JOB_POLL_LIMIT = 900;
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_STATUS_FETCH_FAILURE_LIMIT = 5;
+const ZIP_FETCH_RETRY_LIMIT = 3;
+const TRANSIENT_FETCH_MESSAGE = "連線不穩，繼續等待";
+const JOB_DISCONNECTED_MESSAGE = "連線暫時中斷，系統仍可能在背景執行中，請稍候或至任務紀錄查看結果。";
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -1257,7 +1264,7 @@ function renderInputs(system) {
       ? "產生提示詞"
       : system.result === "video"
         ? "AI製作影片"
-        : ["A6-1", "A6-2"].includes(system.id)
+        : MULTI_IMAGE_ZIP_SYSTEM_IDS.has(system.id)
           ? "生成 8 個建築視角"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
@@ -1278,8 +1285,8 @@ function renderResult(system) {
   activeResultUrls = [];
   const downloadButton = $("#downloadResult");
   if (downloadButton) {
-    downloadButton.textContent = ["A6-1", "A6-2"].includes(system.id) ? "Save ZIP" : "Save";
-    downloadButton.title = ["A6-1", "A6-2"].includes(system.id)
+    downloadButton.textContent = getDownloadButtonLabel(system);
+    downloadButton.title = isZipDownloadMode(system)
       ? "下載 8 張成果 ZIP"
       : "下載成果";
   }
@@ -1322,6 +1329,66 @@ function getApiBase() {
   return (window.ARCHITECT_AI_API_BASE || "").replace(/\/$/, "");
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isZipDownloadMode(system = getActiveSystem()) {
+  return system.result === "image" && (MULTI_IMAGE_ZIP_SYSTEM_IDS.has(system.id) || activeResultUrls.length > 1);
+}
+
+function updateDownloadButtonForResults(system = getActiveSystem()) {
+  const downloadButton = $("#downloadResult");
+  if (!downloadButton) return;
+
+  downloadButton.textContent = getDownloadButtonLabel(system);
+  downloadButton.title = isZipDownloadMode(system)
+    ? `下載 ${activeResultUrls.length || 8} 張成果 ZIP`
+    : "下載成果";
+}
+
+function isRecoverableFetchError(error) {
+  const message = String(error?.message || "");
+  return (
+    error?.code === "JOB_STATUS_FETCH" ||
+    error?.name === "TypeError" ||
+    error?.name === "SyntaxError" ||
+    /Failed to fetch|NetworkError|Load failed/i.test(message)
+  );
+}
+
+function createJobStatusFetchError(message = "無法取得任務狀態") {
+  const error = new Error(message);
+  error.code = "JOB_STATUS_FETCH";
+  return error;
+}
+
+function createJobDisconnectedError() {
+  const error = new Error(JOB_DISCONNECTED_MESSAGE);
+  error.code = "JOB_STATUS_DISCONNECTED";
+  return error;
+}
+
+function isJobDisconnectedError(error) {
+  return error?.code === "JOB_STATUS_DISCONNECTED";
+}
+
+function getJobErrorMessage(error) {
+  if (isJobDisconnectedError(error) || isRecoverableFetchError(error)) {
+    return JOB_DISCONNECTED_MESSAGE;
+  }
+  return `任務未完成：${error?.message || "任務失敗"}`;
+}
+
+function showResultMessage(system, message) {
+  if (system.result === "prompt") {
+    promptOutput.textContent = message;
+  } else {
+    mainPreview.textContent = message;
+    thumbGrid.innerHTML = "";
+  }
+}
+
 function fieldNameForInput(input) {
   if (input.key === "building") return "image";
   if (input.key === "style") return "style_image";
@@ -1339,6 +1406,7 @@ function setComparisonResult(originalUrl, resultUrl) {
   activeResultUrl = resultUrl;
   activeResultType = "image";
   activeResultUrls = [resultUrl];
+  updateDownloadButtonForResults();
   prepareResultBlob(resultUrl);
   mainPreview.innerHTML = `
     <div class="image-compare">
@@ -1366,6 +1434,7 @@ function setImageResults(imageUrls) {
     activeResultBlob = null;
     activeResultBlobPromise = null;
     activeResultUrls = [];
+    updateDownloadButtonForResults();
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
     return;
   }
@@ -1373,6 +1442,7 @@ function setImageResults(imageUrls) {
   activeResultUrls = [...imageUrls];
   activeResultUrl = imageUrls[0];
   activeResultType = "image";
+  updateDownloadButtonForResults();
   prepareResultBlob(imageUrls[0]);
   mainPreview.innerHTML = `<img src="${imageUrls[0]}" alt="AI render result" />`;
   thumbGrid.innerHTML = "";
@@ -1397,6 +1467,7 @@ function setVideoResults(videoUrls) {
     activeResultBlob = null;
     activeResultBlobPromise = null;
     activeResultUrls = [];
+    updateDownloadButtonForResults();
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
     thumbGrid.innerHTML = "";
     return;
@@ -1405,6 +1476,7 @@ function setVideoResults(videoUrls) {
   activeResultUrls = [...videoUrls];
   activeResultUrl = videoUrls[0];
   activeResultType = "video";
+  updateDownloadButtonForResults();
   prepareResultBlob(videoUrls[0]);
   mainPreview.innerHTML = `
     <video controls playsinline preload="metadata">
@@ -1490,29 +1562,57 @@ function renderJobProgress(system, job = {}) {
 
 async function pollJob(jobId, system) {
   const apiBase = getApiBase();
-  for (let attempt = 0; attempt < 900; attempt += 1) {
-    const response = await fetch(`${apiBase}/api/jobs/${jobId}`);
-    if (!response.ok) throw new Error("無法取得任務狀態");
-    const job = await response.json();
+  let consecutiveFetchFailures = 0;
+  let lastJob = {
+    stage: "analyzing",
+    stage_label: "分析使用者提供資訊",
+    progress_percent: 8,
+  };
 
-    if (job.status === "completed") {
-      if (system.result === "prompt") {
-        promptOutput.textContent = job.output_text || "任務完成，但沒有收到提示詞。";
-      } else {
-        setJobResults(system, job);
+  for (let attempt = 0; attempt < JOB_POLL_LIMIT; attempt += 1) {
+    try {
+      const response = await fetch(`${apiBase}/api/jobs/${jobId}`);
+      if (!response.ok) throw createJobStatusFetchError();
+      const job = await response.json();
+      consecutiveFetchFailures = 0;
+      lastJob = job;
+
+      if (job.status === "completed") {
+        if (system.result === "prompt") {
+          promptOutput.textContent = job.output_text || "任務完成，但沒有收到提示詞。";
+        } else {
+          setJobResults(system, job);
+        }
+        return;
       }
-      return;
-    }
 
-    if (job.status === "failed") {
-      throw new Error(job.error || "任務失敗");
-    }
+      if (job.status === "failed") {
+        throw new Error(job.error || "任務失敗");
+      }
 
-    renderJobProgress(system, job);
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      renderJobProgress(system, job);
+      await wait(JOB_POLL_INTERVAL_MS);
+    } catch (error) {
+      if (!isRecoverableFetchError(error)) throw error;
+      consecutiveFetchFailures += 1;
+
+      if (consecutiveFetchFailures >= JOB_STATUS_FETCH_FAILURE_LIMIT) {
+        throw createJobDisconnectedError();
+      }
+
+      renderJobProgress(system, {
+        ...lastJob,
+        stage_label:
+          consecutiveFetchFailures === 1
+            ? TRANSIENT_FETCH_MESSAGE
+            : `${TRANSIENT_FETCH_MESSAGE}（第 ${consecutiveFetchFailures} 次重試）`,
+        progress_percent: Math.max(8, Number(lastJob.progress_percent || 8)),
+      });
+      await wait(JOB_POLL_INTERVAL_MS * Math.min(consecutiveFetchFailures + 1, 4));
+    }
   }
 
-  throw new Error("等待時間過長，請稍後再查看結果");
+  throw new Error("等待時間過長，請稍後再至任務紀錄查看結果");
 }
 
 function validateInputs(system) {
@@ -1590,10 +1690,11 @@ async function submitOrSimulateGenerate() {
   try {
     await submitRealJob(system);
   } catch (error) {
-    if (system.result === "prompt") {
-      promptOutput.textContent = `任務未完成：${error.message}`;
-    } else {
-      mainPreview.innerHTML = `<span>任務未完成：${error.message}</span>`;
+    showResultMessage(system, getJobErrorMessage(error));
+    if ((isJobDisconnectedError(error) || isRecoverableFetchError(error)) && getAuthToken()) {
+      wait(3000)
+        .then(loadMemberCenter)
+        .catch(() => {});
     }
   }
 }
@@ -1778,7 +1879,30 @@ async function saveBlob(blob, handle) {
 }
 
 function getDownloadButtonLabel(system = getActiveSystem()) {
-  return ["A6-1", "A6-2"].includes(system.id) ? "Save ZIP" : "Save";
+  return isZipDownloadMode(system) ? "Save ZIP" : "Save";
+}
+
+async function fetchResultBlobWithRetry(url, index) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= ZIP_FETCH_RETRY_LIMIT; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size || blob.type.startsWith("text/")) {
+        throw new Error("invalid media");
+      }
+      return blob;
+    } catch (error) {
+      lastError = error;
+      if (attempt < ZIP_FETCH_RETRY_LIMIT) {
+        await wait(600 * attempt);
+      }
+    }
+  }
+
+  const detail = lastError?.message ? `（${lastError.message}）` : "";
+  throw new Error(`第 ${index + 1} 張成果下載失敗${detail}`);
 }
 
 function getCrc32(bytes) {
@@ -1877,30 +2001,24 @@ async function createStoredZip(files) {
   return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
 }
 
-async function downloadA6Zip(system, button) {
-  if (activeResultUrls.length !== 8) {
-    throw new Error(`Expected 8 results, received ${activeResultUrls.length}`);
+async function downloadImageZip(system, button) {
+  if (activeResultUrls.length < 2) {
+    throw new Error(`ZIP 至少需要 2 張成果，目前收到 ${activeResultUrls.length} 張`);
   }
 
-  button.textContent = "Preparing ZIP...";
-  const files = await Promise.all(
-    activeResultUrls.map(async (url, index) => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Result ${index + 1} download failed: ${response.status}`);
-      const blob = await response.blob();
-      if (!blob.size || blob.type.startsWith("text/")) {
-        throw new Error(`Result ${index + 1} is not a valid image`);
-      }
-      const extension = getBlobExtension(blob, url, "image");
-      return {
-        name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
-        blob,
-      };
-    }),
-  );
+  const files = [];
+  for (const [index, url] of activeResultUrls.entries()) {
+    button.textContent = `ZIP ${index + 1}/${activeResultUrls.length}`;
+    const blob = await fetchResultBlobWithRetry(url, index);
+    const extension = getBlobExtension(blob, url, "image");
+    files.push({
+      name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
+      blob,
+    });
+  }
 
   const zipBlob = await createStoredZip(files);
-  const filename = `${system.id.toLowerCase()}-architect-ai-8-views.zip`;
+  const filename = `${system.id.toLowerCase()}-architect-ai-${files.length}-views.zip`;
   button.textContent = "Choose location...";
   const handle = await chooseSaveHandle(filename, "archive", "zip", "application/zip");
   button.textContent = "Saving ZIP...";
@@ -1936,7 +2054,7 @@ $("#downloadResult").addEventListener("click", async () => {
     return;
   }
 
-  if (["A6-1", "A6-2"].includes(system.id)) {
+  if (isZipDownloadMode(system)) {
     if (!activeResultUrls.length) {
       button.textContent = "No result";
       window.setTimeout(() => (button.textContent = defaultLabel), 1600);
@@ -1945,7 +2063,7 @@ $("#downloadResult").addEventListener("click", async () => {
 
     button.disabled = true;
     try {
-      await downloadA6Zip(system, button);
+      await downloadImageZip(system, button);
       button.textContent = "ZIP Saved";
     } catch (error) {
       button.textContent =
@@ -1954,9 +2072,10 @@ $("#downloadResult").addEventListener("click", async () => {
           : error?.message === "SAVE_PICKER_UNSUPPORTED"
             ? "Use Edge / Chrome"
             : "ZIP failed";
+      button.title = error?.message || "ZIP failed";
     } finally {
       button.disabled = false;
-      window.setTimeout(() => (button.textContent = defaultLabel), 2400);
+      window.setTimeout(() => updateDownloadButtonForResults(system), 2400);
     }
     return;
   }
