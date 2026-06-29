@@ -258,7 +258,9 @@ let activeResultType = "";
 let activeResultBlob = null;
 let activeResultBlobPromise = null;
 let activeResultUrls = [];
+let activeResultOriginalUrls = [];
 let activeResultJobId = "";
+let activeResultIndex = 0;
 let isHowToUseOpen = false;
 const MULTI_IMAGE_ZIP_SYSTEM_IDS = new Set(["A6-1", "A6-2"]);
 const JOB_POLL_LIMIT = 900;
@@ -1284,7 +1286,9 @@ function renderResult(system) {
   activeResultBlob = null;
   activeResultBlobPromise = null;
   activeResultUrls = [];
+  activeResultOriginalUrls = [];
   activeResultJobId = "";
+  activeResultIndex = 0;
   const downloadButton = $("#downloadResult");
   if (downloadButton) {
     downloadButton.textContent = getDownloadButtonLabel(system);
@@ -1329,6 +1333,30 @@ function renderResult(system) {
 
 function getApiBase() {
   return (window.ARCHITECT_AI_API_BASE || "").replace(/\/$/, "");
+}
+
+function publicSystemFileId(system = getActiveSystem()) {
+  return (system.id || activeId || "AIA").toUpperCase().replace(/[^A-Z0-9_-]/g, "") || "AIA";
+}
+
+function getResultFileLabel(system = getActiveSystem(), type = activeResultType) {
+  if (type === "video") return "video";
+  return publicSystemFileId(system).startsWith("A6") ? "view" : "result";
+}
+
+function getResultFilename(system, index, extension, type = activeResultType) {
+  const safeExtension = String(extension || (type === "video" ? "mp4" : "png")).replace(/^\./, "");
+  return `${publicSystemFileId(system)}-${getResultFileLabel(system, type)}-${String(index + 1).padStart(2, "0")}.${safeExtension}`;
+}
+
+function getJobOutputUrl(system, jobId, index, originalUrl, type = "image") {
+  const apiBase = getApiBase();
+  if (!apiBase || !jobId) return originalUrl;
+
+  const group = type === "video" ? "videos" : "images";
+  const extension = getResultExtension(originalUrl, type);
+  const filename = getResultFilename(system, index, extension, type);
+  return `${apiBase}/api/jobs/${encodeURIComponent(jobId)}/outputs/${group}/${index + 1}/${encodeURIComponent(filename)}`;
 }
 
 function wait(ms) {
@@ -1398,16 +1426,35 @@ function fieldNameForInput(input) {
   return input.key;
 }
 
+function createResultImage(src, alt, fallbackSrc = "") {
+  const image = document.createElement("img");
+  image.src = src;
+  image.alt = alt;
+  if (fallbackSrc && fallbackSrc !== src) {
+    image.addEventListener("error", () => {
+      image.src = fallbackSrc;
+    }, { once: true });
+  }
+  return image;
+}
+
+function renderMainResultImage(src, fallbackSrc = "") {
+  mainPreview.innerHTML = "";
+  mainPreview.append(createResultImage(src, "AI render result", fallbackSrc));
+}
+
 function getOriginalPreview(system) {
   return system.inputs
     .map((input) => previews.get(`${system.id}-${input.key}`))
     .find(Boolean);
 }
 
-function setComparisonResult(originalUrl, resultUrl) {
+function setComparisonResult(originalUrl, resultUrl, fallbackResultUrl = resultUrl) {
   activeResultUrl = resultUrl;
   activeResultType = "image";
   activeResultUrls = [resultUrl];
+  activeResultOriginalUrls = [fallbackResultUrl];
+  activeResultIndex = 0;
   updateDownloadButtonForResults();
   prepareResultBlob(resultUrl);
   mainPreview.innerHTML = `
@@ -1423,66 +1470,81 @@ function setComparisonResult(originalUrl, resultUrl) {
     </div>
   `;
   const comparison = mainPreview.querySelector(".image-compare");
+  const afterImage = comparison.querySelector(".image-compare-after img");
+  if (fallbackResultUrl && fallbackResultUrl !== resultUrl) {
+    afterImage.addEventListener("error", () => {
+      afterImage.src = fallbackResultUrl;
+    }, { once: true });
+  }
   comparison.querySelector("input").addEventListener("input", (event) => {
     comparison.style.setProperty("--compare-position", `${event.target.value}%`);
   });
   thumbGrid.innerHTML = "";
 }
 
-function setImageResults(imageUrls) {
+function setImageResults(imageUrls, system = getActiveSystem(), jobId = activeResultJobId) {
   if (!imageUrls.length) {
     activeResultUrl = "";
     activeResultType = "";
     activeResultBlob = null;
     activeResultBlobPromise = null;
     activeResultUrls = [];
+    activeResultOriginalUrls = [];
+    activeResultIndex = 0;
     updateDownloadButtonForResults();
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可顯示的成果圖。</span>";
     return;
   }
 
-  activeResultUrls = [...imageUrls];
-  activeResultUrl = imageUrls[0];
+  activeResultOriginalUrls = [...imageUrls];
+  activeResultUrls = imageUrls.map((imageUrl, index) => getJobOutputUrl(system, jobId, index, imageUrl, "image"));
+  activeResultUrl = activeResultUrls[0];
   activeResultType = "image";
+  activeResultIndex = 0;
   updateDownloadButtonForResults();
-  prepareResultBlob(imageUrls[0]);
-  mainPreview.innerHTML = `<img src="${imageUrls[0]}" alt="AI render result" />`;
+  prepareResultBlob(activeResultUrl, 0);
+  renderMainResultImage(activeResultUrl, activeResultOriginalUrls[0]);
   thumbGrid.innerHTML = "";
-  imageUrls.forEach((imageUrl, index) => {
+  activeResultUrls.forEach((imageUrl, index) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.innerHTML = `<img src="${imageUrl}" alt="Result ${index + 1}" />`;
+    button.append(createResultImage(imageUrl, `Result ${index + 1}`, activeResultOriginalUrls[index]));
     button.addEventListener("click", () => {
       activeResultUrl = imageUrl;
       activeResultType = "image";
-      prepareResultBlob(imageUrl);
-      mainPreview.innerHTML = `<img src="${imageUrl}" alt="AI render result" />`;
+      activeResultIndex = index;
+      prepareResultBlob(imageUrl, index);
+      renderMainResultImage(imageUrl, activeResultOriginalUrls[index]);
     });
     thumbGrid.append(button);
   });
 }
 
-function setVideoResults(videoUrls) {
+function setVideoResults(videoUrls, system = getActiveSystem(), jobId = activeResultJobId) {
   if (!videoUrls.length) {
     activeResultUrl = "";
     activeResultType = "";
     activeResultBlob = null;
     activeResultBlobPromise = null;
     activeResultUrls = [];
+    activeResultOriginalUrls = [];
+    activeResultIndex = 0;
     updateDownloadButtonForResults();
     mainPreview.innerHTML = "<span>任務完成，但沒有收到可播放的影片。</span>";
     thumbGrid.innerHTML = "";
     return;
   }
 
-  activeResultUrls = [...videoUrls];
-  activeResultUrl = videoUrls[0];
+  activeResultOriginalUrls = [...videoUrls];
+  activeResultUrls = videoUrls.map((videoUrl, index) => getJobOutputUrl(system, jobId, index, videoUrl, "video"));
+  activeResultUrl = activeResultUrls[0];
   activeResultType = "video";
+  activeResultIndex = 0;
   updateDownloadButtonForResults();
-  prepareResultBlob(videoUrls[0]);
+  prepareResultBlob(activeResultUrl, 0);
   mainPreview.innerHTML = `
     <video controls playsinline preload="metadata">
-      <source src="${videoUrls[0]}" />
+      <source src="${activeResultUrl}" />
       您的瀏覽器無法播放此影片。
     </video>
   `;
@@ -1492,16 +1554,16 @@ function setVideoResults(videoUrls) {
 function setJobResults(system, job) {
   activeResultJobId = job.job_id || "";
   if (system.result === "video") {
-    setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []));
+    setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []), system, activeResultJobId);
     return;
   }
   const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
   const originalUrl = getOriginalPreview(system);
   if (["A8-1", "A8-2"].includes(system.id) && originalUrl && imageUrls[0]) {
-    setComparisonResult(originalUrl, imageUrls[0]);
+    setComparisonResult(originalUrl, getJobOutputUrl(system, activeResultJobId, 0, imageUrls[0], "image"), imageUrls[0]);
     return;
   }
-  setImageResults(imageUrls);
+  setImageResults(imageUrls, system, activeResultJobId);
 }
 
 function openJobResult(index) {
@@ -1770,9 +1832,7 @@ $("#copyResult").addEventListener("click", async () => {
     }
 
     if (activeResultType === "image" && window.ClipboardItem && navigator.clipboard.write) {
-      const response = await fetch(activeResultUrl);
-      if (!response.ok) throw new Error(`Copy failed: ${response.status}`);
-      const pngBlob = await convertImageBlobToPng(await response.blob());
+      const pngBlob = await convertImageBlobToPng(await fetchResultBlobWithRetry(activeResultUrl, activeResultIndex));
       await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
       button.textContent = "Image copied";
       return;
@@ -1819,16 +1879,10 @@ function getBlobExtension(blob, url, type) {
   return extensionsByMimeType[blob.type.split(";")[0]] || getResultExtension(url, type);
 }
 
-function prepareResultBlob(url) {
+function prepareResultBlob(url, index = activeResultIndex) {
   activeResultBlob = null;
-  activeResultBlobPromise = fetch(url)
-    .then((response) => {
-      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-      return response.blob();
-    })
+  activeResultBlobPromise = fetchResultBlobWithRetry(url, index)
     .then((blob) => {
-      if (!blob.size) throw new Error("Downloaded result is empty");
-      if (blob.type.startsWith("text/")) throw new Error("Downloaded result is not media");
       if (url === activeResultUrl) activeResultBlob = blob;
       return blob;
     })
@@ -1887,19 +1941,22 @@ function getDownloadButtonLabel(system = getActiveSystem()) {
 
 async function fetchResultBlobWithRetry(url, index) {
   let lastError = null;
-  for (let attempt = 1; attempt <= ZIP_FETCH_RETRY_LIMIT; attempt += 1) {
-    try {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const blob = await response.blob();
-      if (!blob.size || blob.type.startsWith("text/")) {
-        throw new Error("invalid media");
-      }
-      return blob;
-    } catch (error) {
-      lastError = error;
-      if (attempt < ZIP_FETCH_RETRY_LIMIT) {
-        await wait(600 * attempt);
+  const candidateUrls = [...new Set([url, activeResultOriginalUrls[index]].filter(Boolean))];
+  for (const candidateUrl of candidateUrls) {
+    for (let attempt = 1; attempt <= ZIP_FETCH_RETRY_LIMIT; attempt += 1) {
+      try {
+        const response = await fetch(candidateUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.size || blob.type.startsWith("text/")) {
+          throw new Error("invalid media");
+        }
+        return blob;
+      } catch (error) {
+        lastError = error;
+        if (attempt < ZIP_FETCH_RETRY_LIMIT) {
+          await wait(600 * attempt);
+        }
       }
     }
   }
@@ -2027,7 +2084,7 @@ async function downloadImageZip(system, button) {
     throw new Error(`ZIP 至少需要 2 張成果，目前收到 ${activeResultUrls.length} 張`);
   }
 
-  const filename = `${system.id.toLowerCase()}-architect-ai-${activeResultUrls.length}-views.zip`;
+  const filename = `${publicSystemFileId(system)}-architect-ai-${activeResultUrls.length}-views.zip`;
   let zipBlob = null;
   try {
     button.textContent = "Preparing ZIP...";
@@ -2043,7 +2100,7 @@ async function downloadImageZip(system, button) {
       const blob = await fetchResultBlobWithRetry(url, index);
       const extension = getBlobExtension(blob, url, "image");
       files.push({
-        name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
+        name: getResultFilename(system, index, extension, "image"),
         blob,
       });
     }
@@ -2130,7 +2187,7 @@ $("#downloadResult").addEventListener("click", async () => {
   button.textContent = "Saving...";
   button.disabled = true;
   const extension = getBlobExtension(activeResultBlob, activeResultUrl, activeResultType);
-  const filename = `${filenameBase}.${extension}`;
+  const filename = getResultFilename(system, activeResultIndex, extension, activeResultType);
 
   try {
     button.textContent = "Choose location...";
