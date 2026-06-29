@@ -258,6 +258,7 @@ let activeResultType = "";
 let activeResultBlob = null;
 let activeResultBlobPromise = null;
 let activeResultUrls = [];
+let activeResultJobId = "";
 let isHowToUseOpen = false;
 const MULTI_IMAGE_ZIP_SYSTEM_IDS = new Set(["A6-1", "A6-2"]);
 const JOB_POLL_LIMIT = 900;
@@ -1283,6 +1284,7 @@ function renderResult(system) {
   activeResultBlob = null;
   activeResultBlobPromise = null;
   activeResultUrls = [];
+  activeResultJobId = "";
   const downloadButton = $("#downloadResult");
   if (downloadButton) {
     downloadButton.textContent = getDownloadButtonLabel(system);
@@ -1488,6 +1490,7 @@ function setVideoResults(videoUrls) {
 }
 
 function setJobResults(system, job) {
+  activeResultJobId = job.job_id || "";
   if (system.result === "video") {
     setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []));
     return;
@@ -1905,6 +1908,24 @@ async function fetchResultBlobWithRetry(url, index) {
   throw new Error(`第 ${index + 1} 張成果下載失敗${detail}`);
 }
 
+async function fetchServerZipBlob() {
+  const apiBase = getApiBase();
+  if (!apiBase || !activeResultJobId) return null;
+
+  const response = await fetch(`${apiBase}/api/jobs/${encodeURIComponent(activeResultJobId)}/outputs.zip`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`API ZIP download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  if (!blob.size || blob.type.startsWith("text/")) {
+    throw new Error("API ZIP is empty or invalid");
+  }
+  return blob;
+}
+
 function getCrc32(bytes) {
   let crc = 0xffffffff;
   for (const byte of bytes) {
@@ -2006,19 +2027,29 @@ async function downloadImageZip(system, button) {
     throw new Error(`ZIP 至少需要 2 張成果，目前收到 ${activeResultUrls.length} 張`);
   }
 
-  const files = [];
-  for (const [index, url] of activeResultUrls.entries()) {
-    button.textContent = `ZIP ${index + 1}/${activeResultUrls.length}`;
-    const blob = await fetchResultBlobWithRetry(url, index);
-    const extension = getBlobExtension(blob, url, "image");
-    files.push({
-      name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
-      blob,
-    });
+  const filename = `${system.id.toLowerCase()}-architect-ai-${activeResultUrls.length}-views.zip`;
+  let zipBlob = null;
+  try {
+    button.textContent = "Preparing ZIP...";
+    zipBlob = await fetchServerZipBlob();
+  } catch {
+    zipBlob = null;
   }
 
-  const zipBlob = await createStoredZip(files);
-  const filename = `${system.id.toLowerCase()}-architect-ai-${files.length}-views.zip`;
+  if (!zipBlob) {
+    const files = [];
+    for (const [index, url] of activeResultUrls.entries()) {
+      button.textContent = `ZIP ${index + 1}/${activeResultUrls.length}`;
+      const blob = await fetchResultBlobWithRetry(url, index);
+      const extension = getBlobExtension(blob, url, "image");
+      files.push({
+        name: `${system.id.toLowerCase()}-view-${String(index + 1).padStart(2, "0")}.${extension}`,
+        blob,
+      });
+    }
+    zipBlob = await createStoredZip(files);
+  }
+
   button.textContent = "Choose location...";
   const handle = await chooseSaveHandle(filename, "archive", "zip", "application/zip");
   button.textContent = "Saving ZIP...";
