@@ -122,19 +122,19 @@ const systems = [
     prompt: false,
   },
   {
-    id: "A7",
-    title: "Style Sketch Site HD",
-    subtitle: "風格圖 + Sketch + Site + HD",
-    desc: "將風格、量體與基地整合後輸出高解析提案圖。",
+    id: "A7-1",
+    activeTitle: "A7-1｜Style PLUS",
+    title: "Style PLUS",
+    subtitle: "建築形體隨風格圖向外變形",
+    desc: "上傳建築量體圖與風格參考圖，AI 會讓建築形體跟隨風格圖增加、延展與變形。",
     tier: "會員",
     status: "Live System",
     result: "image",
     inputs: [
-      { key: "sketch", label: "Sketch / 3D 量體圖" },
-      { key: "style", label: "風格參考圖" },
-      { key: "site", label: "基地與周邊環境圖" },
+      { key: "sketch", label: "建築量體圖 / Massing" },
+      { key: "style", label: "風格圖 / Style Reference" },
     ],
-    count: true,
+    count: false,
     prompt: false,
   },
   {
@@ -198,6 +198,28 @@ const systems = [
     count: false,
     prompt: false,
   },
+  {
+    id: "A9-3",
+    activeTitle: "A9-3｜AI Motion Render",
+    title: "AI Motion Render",
+    subtitle: "7 張圖 + 6 段引導提示詞",
+    desc: "沿用 A9-2 的七張關鍵圖動畫流程，並在每兩張圖之間加入可編輯的引導提示詞，控制影片連續變化方向。",
+    tier: "會員",
+    status: "Live System",
+    result: "video",
+    inputs: [
+      { key: "image_1", label: "關鍵圖 1 / Start", optional: true, defaultLabel: "使用 workflow 預載圖 1，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/01.jpg" },
+      { key: "image_2", label: "關鍵圖 2", optional: true, defaultLabel: "使用 workflow 預載圖 2，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/02.jpg" },
+      { key: "image_3", label: "關鍵圖 3", optional: true, defaultLabel: "使用 workflow 預載圖 3，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/03.jpg" },
+      { key: "image_4", label: "關鍵圖 4", optional: true, defaultLabel: "使用 workflow 預載圖 4，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/04.jpg" },
+      { key: "image_5", label: "關鍵圖 5", optional: true, defaultLabel: "使用 workflow 預載圖 5，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/05.jpg" },
+      { key: "image_6", label: "關鍵圖 6", optional: true, defaultLabel: "使用 workflow 預載圖 6，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/06.jpg" },
+      { key: "image_7", label: "關鍵圖 7 / End", optional: true, defaultLabel: "使用 workflow 預載圖 7，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/07.jpg" },
+    ],
+    count: false,
+    prompt: false,
+    transitionPrompts: true,
+  },
 ];
 
 const gridSystems = [
@@ -224,7 +246,13 @@ const gridSystems = [
     targetId: "A6-1",
     title: "Creative Multi-View",
   },
-  systems.find((system) => system.id === "A7"),
+  {
+    ...systems.find((system) => system.id === "A7-1"),
+    id: "A7",
+    targetId: "A7-1",
+    title: "Style PLUS",
+    subtitle: "建築形體隨風格圖變形",
+  },
   {
     ...systems.find((system) => system.id === "A8-1"),
     id: "A8",
@@ -244,9 +272,9 @@ const sidebarGroups = [
   { id: "A4", systemId: "A4" },
   { id: "A5", systemId: "A5" },
   { id: "A6", title: "Creative Multi-View", summary: "多角度透視", childIds: ["A6-1", "A6-2"] },
-  { id: "A7", systemId: "A7" },
+  { id: "A7", title: "Style PLUS", summary: "風格量體變形", childIds: ["A7-1"] },
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
-  { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2"] },
+  { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
 
 let activeId = "A1-1";
@@ -986,10 +1014,18 @@ function uploadField(input) {
   wrapper.className = "upload-box";
   const key = `${activeId}-${input.key}`;
   const src = previews.get(key);
+  const placeholder = input.defaultLabel || "上傳 / 預覽 / 更換";
+  const defaultSrc = input.defaultSrc || "";
   wrapper.innerHTML = `
     <span class="upload-label">${input.label}</span>
     <label class="drop-zone">
-      ${src ? `<img src="${src}" alt="${input.label} preview" />` : "<span>上傳 / 預覽 / 更換</span>"}
+      ${
+        src
+          ? `<img src="${src}" alt="${escapeHtml(input.label)} preview" />`
+          : defaultSrc
+            ? `<img src="${escapeHtml(defaultSrc)}" alt="${escapeHtml(input.label)} workflow preview" />`
+            : `<span>${escapeHtml(placeholder)}</span>`
+      }
       <input type="file" accept="image/png,image/jpeg,image/webp" aria-label="${input.label}" />
     </label>
   `;
@@ -1018,6 +1054,55 @@ const A9_PROMPT_PRESETS = {
   horizontal: A9_HORIZONTAL_PROMPT,
   "fly-around": A9_FLY_AROUND_PROMPT,
   orbit: A9_ORBIT_PROMPT,
+};
+
+const A9_3_WORKFLOW_PROMPTS = [
+  "",
+  "施工機具由施工圍籬外側進入基地，並且開始運作整理地形。",
+  "增加地下室開挖深度，並且架設水平支撐",
+  "由筏基底板逐層建設到一樓樓地版",
+  "塔吊隨著建設中建築物增加高度",
+  "建築物體固定不動，塔吊拆除後，外牆立面由上往下改變表面狀態",
+];
+
+const A9_3_CONSTRUCTION_PROMPTS = [
+  "基地由現況逐步轉為施工準備狀態，施工圍籬與臨時設施出現。",
+  "施工機具由施工圍籬外側進入基地，並且開始運作整理地形。",
+  "增加地下室開挖深度，並且架設水平支撐。",
+  "由筏基底板逐層建設到一樓樓地版。",
+  "塔吊隨著建設中建築物增加高度。",
+  "建築物體固定不動，塔吊拆除後，外牆立面由上往下改變表面狀態。",
+];
+
+const A9_3_MASSING_PROMPTS = [
+  "建築量體從初始輪廓逐步向外延展，保持基地與背景穩定。",
+  "主要量體開始增加水平與垂直層次，建築邊界更清楚。",
+  "外部陽台、退縮、懸挑與轉角量體逐步生成，動作平順。",
+  "立面開口、垂直線條與結構節奏逐步形成，維持建築比例。",
+  "材質與外牆系統逐步覆蓋量體，建築保持穩定不漂移。",
+  "最後整理立面細節、光影與材質一致性，完成清楚的建築成果。",
+];
+
+const A9_3_FACADE_PROMPTS = [
+  "鏡頭維持穩定，建築物量體不位移，立面從概念狀態開始轉換。",
+  "立面材質由粗略表面逐步變成清楚的建築外牆系統。",
+  "窗框、開口、欄杆與遮陽元素依照原本量體位置逐步出現。",
+  "立面細節由下往上或由左往右連續完成，背景保持不變。",
+  "材質、玻璃反射與陰影逐步加強，建築輪廓保持穩定。",
+  "最後完成整體立面表情，畫面保持清楚、連續、沒有跳動。",
+];
+
+const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_WORKFLOW_PROMPTS.map((value, index) => ({
+  key: `prompt_${index + 1}`,
+  label: `轉場提示詞 ${index + 1}：圖 ${index + 1} 到圖 ${index + 2}`,
+  value,
+}));
+
+const A9_3_TRANSITION_PROMPT_PRESETS = {
+  workflow: A9_3_WORKFLOW_PROMPTS,
+  construction: A9_3_CONSTRUCTION_PROMPTS,
+  massing: A9_3_MASSING_PROMPTS,
+  facade: A9_3_FACADE_PROMPTS,
 };
 
 const A2_FLOOR_PLAN_PROMPT_PRESETS = {
@@ -1148,10 +1233,12 @@ const OPERATION_GUIDES = {
   "A6-1": "./assets/operation-guides/A6-1.jpg",
   "A6-2": "./assets/operation-guides/A6-2.jpg",
   A7: "./assets/operation-guides/A7.jpg",
+  "A7-1": "./assets/operation-guides/A7.jpg",
   "A8-1": "./assets/operation-guides/A8-1.jpg",
   "A8-2": "./assets/operation-guides/A8-2.jpg",
   "A9-1": "./assets/operation-guides/A9-1.jpg",
   "A9-2": "./assets/operation-guides/A9-2.jpg",
+  "A9-3": "./assets/operation-guides/A9-2.jpg",
 };
 
 function textPromptField(system) {
@@ -1212,6 +1299,43 @@ function textPromptField(system) {
   return wrapper;
 }
 
+function transitionPromptFields(system) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field-box transition-prompt-box";
+  const fields = system.id === "A9-3" ? A9_3_TRANSITION_PROMPT_FIELDS : [];
+  wrapper.innerHTML = `
+    <label>A9-3 圖面之間引導提示詞</label>
+    <div class="prompt-presets" aria-label="A9-3 推薦提示詞">
+      <span>推薦提示詞</span>
+      <button type="button" data-transition-preset="workflow">1. 工作流範例</button>
+      <button type="button" data-transition-preset="construction">2. 施工成長</button>
+      <button type="button" data-transition-preset="massing">3. 量體變形</button>
+      <button type="button" data-transition-preset="facade">4. 立面完成</button>
+    </div>
+    <div class="transition-prompt-grid">
+      ${fields
+        .map(
+          (field) => `
+            <label class="transition-prompt-field">
+              <span>${escapeHtml(field.label)}</span>
+              <textarea data-transition-prompt="${field.key}" placeholder="描述這兩張圖之間要如何連續變化">${escapeHtml(field.value)}</textarea>
+            </label>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+  wrapper.querySelectorAll("[data-transition-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const values = A9_3_TRANSITION_PROMPT_PRESETS[button.dataset.transitionPreset] || A9_3_WORKFLOW_PROMPTS;
+      wrapper.querySelectorAll("[data-transition-prompt]").forEach((textarea, index) => {
+        textarea.value = values[index] || "";
+      });
+    });
+  });
+  return wrapper;
+}
+
 function countField() {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
@@ -1257,6 +1381,7 @@ function renderInputs(system) {
   inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
   if (system.prompt) inputStack.append(textPromptField(system));
+  if (system.transitionPrompts) inputStack.append(transitionPromptFields(system));
   if (system.count) inputStack.append(countField());
 
   const generateButton = document.createElement("button");
@@ -1681,7 +1806,7 @@ async function pollJob(jobId, system) {
 }
 
 function validateInputs(system) {
-  const missing = system.inputs.filter((input) => !uploadedFiles.get(`${system.id}-${input.key}`));
+  const missing = system.inputs.filter((input) => !input.optional && !uploadedFiles.get(`${system.id}-${input.key}`));
   if (missing.length) {
     return `請先上傳：${missing.map((input) => input.label).join("、")}`;
   }
@@ -1703,6 +1828,11 @@ async function submitRealJob(system) {
   formData.append("prompt", $("#customPrompt")?.value || "");
   formData.append("count", ($("#outputCount")?.value || "1").trim().startsWith("6") ? "6" : "1");
   formData.append("client_id", getClientId());
+  if (system.transitionPrompts) {
+    document.querySelectorAll("[data-transition-prompt]").forEach((textarea) => {
+      formData.append(textarea.dataset.transitionPrompt, textarea.value || "");
+    });
+  }
 
   system.inputs.forEach((input) => {
     const file = uploadedFiles.get(`${system.id}-${input.key}`);

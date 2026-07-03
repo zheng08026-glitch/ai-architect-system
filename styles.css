@@ -1059,8 +1059,12 @@ section {
 }
 
 .drop-zone span {
+  padding: 0 12px;
   color: var(--soft);
   font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .drop-zone img {
@@ -1122,6 +1126,31 @@ textarea {
   opacity: 0.45;
 }
 
+.transition-prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.transition-prompt-field {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.transition-prompt-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.transition-prompt-field textarea {
+  min-height: 104px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .generation-notice {
   margin: 0;
   padding: 12px 14px;
@@ -1139,6 +1168,7 @@ textarea {
 }
 
 .input-stack.multi-image-inputs .generate-button,
+.input-stack.multi-image-inputs .field-box,
 .input-stack.multi-image-inputs .generation-notice {
   grid-column: 1 / -1;
 }
@@ -1206,6 +1236,10 @@ textarea {
 
 @media (max-width: 720px) {
   .input-stack.multi-image-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .transition-prompt-grid {
     grid-template-columns: 1fr;
   }
 

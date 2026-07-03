@@ -26,6 +26,10 @@ function copyStaticRuntimeFiles() {
       if (existsSync('assets/operation-guides')) {
         cpSync('assets/operation-guides', 'dist/assets/operation-guides', { recursive: true })
       }
+
+      if (existsSync('assets/workflow-defaults')) {
+        cpSync('assets/workflow-defaults', 'dist/assets/workflow-defaults', { recursive: true })
+      }
     },
   }
 }

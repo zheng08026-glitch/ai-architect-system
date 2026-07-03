@@ -21,7 +21,7 @@
 - Build command: `npm run build -- --configLoader native`
 - Build output directory: `dist`
 
-建置後 `vite.config.ts` 會將 `app.js`、`config.js`、Cloudflare 設定檔與 `assets/operation-guides` 一起放入 `dist`。
+建置後 `vite.config.ts` 會將 `app.js`、`config.js`、Cloudflare 設定檔、`assets/operation-guides` 與 `assets/workflow-defaults` 一起放入 `dist`。
 
 ## 上架前必檢查
 
@@ -86,6 +86,7 @@ npm run build -- --configLoader native
 - `_headers`
 - `_redirects`
 - `assets/operation-guides`
+- `assets/workflow-defaults`
 
 再用本機靜態伺服器預覽 `dist`：
 
