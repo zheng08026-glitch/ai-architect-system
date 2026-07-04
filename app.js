@@ -1268,7 +1268,7 @@ const OPERATION_GUIDES = {
   "A6-1": "./assets/operation-guides/A6-1.jpg",
   "A6-2": "./assets/operation-guides/A6-2.jpg",
   A7: "./assets/operation-guides/A7.jpg",
-  "A7-1": "./assets/operation-guides/A7.jpg",
+  "A7-1": "./assets/operation-guides/A7-1.jpg",
   "A8-1": "./assets/operation-guides/A8-1.jpg",
   "A8-2": "./assets/operation-guides/A8-2.jpg",
   "A9-1": "./assets/operation-guides/A9-1.jpg",
