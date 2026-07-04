@@ -297,6 +297,13 @@ const JOB_STATUS_FETCH_FAILURE_LIMIT = 5;
 const ZIP_FETCH_RETRY_LIMIT = 3;
 const TRANSIENT_FETCH_MESSAGE = "連線不穩，繼續等待";
 const JOB_DISCONNECTED_MESSAGE = "連線暫時中斷，系統仍可能在背景執行中，請稍候或至任務紀錄查看結果。";
+const PUBLIC_INPUT_JOB_ERROR_MESSAGE = "任務未完成：輸入錯誤。請檢查上傳圖片、文字提示或檔案格式後再送出。";
+const PUBLIC_SYSTEM_JOB_ERROR_MESSAGE = "任務未完成：系統錯誤。系統已保留紀錄，請稍後再試或聯絡管理員。";
+const PUBLIC_JOB_ERROR_MESSAGE = PUBLIC_SYSTEM_JOB_ERROR_MESSAGE;
+const INPUT_JOB_ERROR_PATTERN =
+  /missing required file|must be an image|invalid image|cannot identify image file|unsupported image|image file is truncated|exceeds the available context|available context size|n_prompt_tokens|prompt is too long|prompt too long|too many tokens/i;
+const INTERNAL_JOB_ERROR_PATTERN =
+  /ComfyUI|OllamaChat|workflow|node|safetensors|Traceback|RuntimeError|prompt_outputs_failed_validation|execution failed|status code|available context|CLIPLoader|VAELoader|UNETLoader/i;
 
 const $ = (selector) => document.querySelector(selector);
 const systemList = $("#systemList");
@@ -412,6 +419,33 @@ function escapeHtml(value = "") {
   });
 }
 
+function isInternalJobError(message = "") {
+  return INTERNAL_JOB_ERROR_PATTERN.test(String(message || ""));
+}
+
+function classifyPublicJobError(job = {}) {
+  const errorType = String(job.error_type || "").toLowerCase();
+  if (errorType === "input" || errorType === "system") return errorType;
+  const rawMessage = String(job.internal_error || job.error || job.public_error || "");
+  return INPUT_JOB_ERROR_PATTERN.test(rawMessage) ? "input" : "system";
+}
+
+function getPublicJobError(job = {}) {
+  if (!job) return "";
+  const rawMessage = String(job.public_error || job.error || "");
+  const publicMessage = String(job.public_error || "");
+  if (!rawMessage && job.status !== "failed") return "";
+  if (publicMessage.includes("輸入錯誤") || publicMessage.includes("系統錯誤")) {
+    return publicMessage;
+  }
+  if (job.status === "failed" || isInternalJobError(rawMessage)) {
+    return classifyPublicJobError(job) === "input"
+      ? PUBLIC_INPUT_JOB_ERROR_MESSAGE
+      : PUBLIC_SYSTEM_JOB_ERROR_MESSAGE;
+  }
+  return rawMessage;
+}
+
 function formatJobTime(value) {
   if (!value) return "";
   const date = typeof value === "number" ? new Date(value * 1000) : new Date(value);
@@ -494,11 +528,12 @@ function renderJobList(records = []) {
       const hasResult =
         job.status === "completed" && (imageUrls.length || videoUrls.length || job.output_text);
       const downloadUrl = imageUrls[0] || "";
+      const errorMessage = getPublicJobError(job);
       return `
         <div class="record-item" data-job-index="${index}">
           <strong>${escapeHtml(job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
           <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}</small>
-          ${job.error ? `<small>${escapeHtml(job.error)}</small>` : ""}
+          ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
             ${
               hasResult
@@ -1532,7 +1567,14 @@ function getJobErrorMessage(error) {
   if (isJobDisconnectedError(error) || isRecoverableFetchError(error)) {
     return JOB_DISCONNECTED_MESSAGE;
   }
-  return `任務未完成：${error?.message || "任務失敗"}`;
+  const rawMessage = String(error?.message || "");
+  const safeMessage = isInternalJobError(rawMessage)
+    ? INPUT_JOB_ERROR_PATTERN.test(rawMessage)
+      ? PUBLIC_INPUT_JOB_ERROR_MESSAGE
+      : PUBLIC_SYSTEM_JOB_ERROR_MESSAGE
+    : rawMessage;
+  if (safeMessage.startsWith("任務未完成")) return safeMessage;
+  return `任務未完成：${safeMessage || "任務失敗"}`;
 }
 
 function showResultMessage(system, message) {
@@ -1777,7 +1819,7 @@ async function pollJob(jobId, system) {
       }
 
       if (job.status === "failed") {
-        throw new Error(job.error || "任務失敗");
+        throw new Error(getPublicJobError(job) || "任務失敗");
       }
 
       renderJobProgress(system, job);
