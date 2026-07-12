@@ -281,6 +281,8 @@ let activeId = "A1-1";
 let expandedSidebarGroup = null;
 const previews = new Map();
 const uploadedFiles = new Map();
+const transitionPromptValues = new Map();
+let a93PresetLoadVersion = 0;
 let activeResultUrl = "";
 let activeResultType = "";
 let activeResultBlob = null;
@@ -936,6 +938,7 @@ function sidebarGroupContains(group, systemId) {
 function activateSystem(systemId, groupId = null) {
   const system = getSystem(systemId);
   if (!system || system.status !== "Live System") return;
+  if (activeId === "A9-3" && system.id !== activeId) a93PresetLoadVersion += 1;
   activeId = system.id;
   expandedSidebarGroup = groupId;
   isHowToUseOpen = false;
@@ -1067,6 +1070,7 @@ function uploadField(input) {
   wrapper.querySelector("input").addEventListener("change", (event) => {
     const [file] = event.target.files;
     if (!file) return;
+    if (key.startsWith("A9-3-")) a93PresetLoadVersion += 1;
     const reader = new FileReader();
     reader.onload = () => {
       previews.set(key, reader.result);
@@ -1127,6 +1131,25 @@ const A9_3_FACADE_PROMPTS = [
   "最後完成整體立面表情，畫面保持清楚、連續、沒有跳動。",
 ];
 
+const A9_3_SITE_LOCATION_PROMPTS = [
+  "太空梭穿越大氣層的視角,進入地球看見台灣。",
+  "穿越雲霧後進入到城市並且看見直升機正在飛行。",
+  "進入前方直升機座艙內,在穿越直升機駕駛艙玻璃。",
+  "看見台北市信義計畫區台北101等地標建築。",
+  "繼續往前走到本案基地空拍圖。",
+  "鳥瞰圖漸漸轉成TOP VIEW，同時顯示出基地範圍、面積、尺寸。",
+];
+
+const A9_3_SITE_LOCATION_IMAGES = [
+  "./assets/workflow-defaults/a9-3/site-location/S01.png",
+  "./assets/workflow-defaults/a9-3/site-location/S02.jpg",
+  "./assets/workflow-defaults/a9-3/site-location/S03.jpg",
+  "./assets/workflow-defaults/a9-3/site-location/S04.jpg",
+  "./assets/workflow-defaults/a9-3/site-location/S05.jpg",
+  "./assets/workflow-defaults/a9-3/site-location/S06.png",
+  "./assets/workflow-defaults/a9-3/site-location/S07.png",
+];
+
 const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_WORKFLOW_PROMPTS.map((value, index) => ({
   key: `prompt_${index + 1}`,
   label: `轉場提示詞 ${index + 1}：圖 ${index + 1} 到圖 ${index + 2}`,
@@ -1138,6 +1161,11 @@ const A9_3_TRANSITION_PROMPT_PRESETS = {
   construction: A9_3_CONSTRUCTION_PROMPTS,
   massing: A9_3_MASSING_PROMPTS,
   facade: A9_3_FACADE_PROMPTS,
+  siteLocation: A9_3_SITE_LOCATION_PROMPTS,
+};
+
+const A9_3_TRANSITION_IMAGE_PRESETS = {
+  siteLocation: A9_3_SITE_LOCATION_IMAGES,
 };
 
 const A2_FLOOR_PLAN_PROMPT_PRESETS = {
@@ -1346,6 +1374,7 @@ function transitionPromptFields(system) {
       <button type="button" data-transition-preset="construction">2. 施工成長</button>
       <button type="button" data-transition-preset="massing">3. 量體變形</button>
       <button type="button" data-transition-preset="facade">4. 立面完成</button>
+      <button type="button" data-transition-preset="siteLocation">5. 基地定位導覽</button>
     </div>
     <div class="transition-prompt-grid">
       ${fields
@@ -1353,22 +1382,102 @@ function transitionPromptFields(system) {
           (field) => `
             <label class="transition-prompt-field">
               <span>${escapeHtml(field.label)}</span>
-              <textarea data-transition-prompt="${field.key}" placeholder="描述這兩張圖之間要如何連續變化">${escapeHtml(field.value)}</textarea>
+              <textarea data-transition-prompt="${field.key}" placeholder="描述這兩張圖之間要如何連續變化">${escapeHtml(transitionPromptValues.get(`${system.id}-${field.key}`) ?? field.value)}</textarea>
             </label>
           `,
         )
         .join("")}
     </div>
   `;
+  wrapper.querySelectorAll("[data-transition-prompt]").forEach((textarea) => {
+    textarea.addEventListener("input", () => {
+      a93PresetLoadVersion += 1;
+      transitionPromptValues.set(`${system.id}-${textarea.dataset.transitionPrompt}`, textarea.value);
+    });
+  });
   wrapper.querySelectorAll("[data-transition-preset]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const values = A9_3_TRANSITION_PROMPT_PRESETS[button.dataset.transitionPreset] || A9_3_WORKFLOW_PROMPTS;
-      wrapper.querySelectorAll("[data-transition-prompt]").forEach((textarea, index) => {
-        textarea.value = values[index] || "";
+    button.addEventListener("click", async () => {
+      const presetKey = button.dataset.transitionPreset;
+      const values = A9_3_TRANSITION_PROMPT_PRESETS[presetKey] || A9_3_WORKFLOW_PROMPTS;
+      const imageSources = A9_3_TRANSITION_IMAGE_PRESETS[presetKey];
+      if (!imageSources) {
+        a93PresetLoadVersion += 1;
+        wrapper.querySelectorAll("[data-transition-prompt]").forEach((textarea, index) => {
+          textarea.value = values[index] || "";
+          transitionPromptValues.set(`${system.id}-${textarea.dataset.transitionPrompt}`, textarea.value);
+        });
+        return;
+      }
+
+      const presetButtons = [...wrapper.querySelectorAll("[data-transition-preset]")];
+      const generateButton = document.querySelector(".generate-button");
+      const editableControls = [...inputStack.querySelectorAll('input[type="file"], textarea')];
+      const originalLabel = button.textContent;
+      const loadVersion = ++a93PresetLoadVersion;
+      presetButtons.forEach((presetButton) => {
+        presetButton.disabled = true;
       });
+      if (generateButton) generateButton.disabled = true;
+      editableControls.forEach((control) => {
+        control.disabled = true;
+      });
+      button.textContent = `${originalLabel}（素材載入中…）`;
+
+      try {
+        const files = await loadTransitionPresetFiles(system, imageSources);
+        if (loadVersion !== a93PresetLoadVersion || activeId !== system.id) return;
+
+        values.forEach((value, index) => {
+          transitionPromptValues.set(`${system.id}-prompt_${index + 1}`, value || "");
+        });
+        system.inputs.forEach((input, index) => {
+          const key = `${system.id}-${input.key}`;
+          previews.set(key, imageSources[index]);
+          uploadedFiles.set(key, files[index]);
+        });
+        renderApp();
+      } catch (error) {
+        console.error("A9-3 preset images could not be loaded", error);
+        button.title = error.message || "素材載入失敗，請重試。";
+        button.textContent = `${originalLabel}（載入失敗）`;
+        window.setTimeout(() => {
+          button.textContent = originalLabel;
+        }, 2400);
+      } finally {
+        presetButtons.forEach((presetButton) => {
+          presetButton.disabled = false;
+        });
+        if (generateButton) generateButton.disabled = false;
+        editableControls.forEach((control) => {
+          control.disabled = false;
+        });
+        if (button.isConnected && button.textContent.includes("素材載入中")) {
+          button.textContent = originalLabel;
+        }
+      }
     });
   });
   return wrapper;
+}
+
+async function loadTransitionPresetFiles(system, imageSources) {
+  if (imageSources.length !== system.inputs.length) {
+    throw new Error("預設素材數量與 A9-3 圖片欄位不一致。");
+  }
+
+  return Promise.all(
+    imageSources.map(async (src, index) => {
+      const response = await fetch(src);
+      if (!response.ok) {
+        throw new Error(`無法載入預設素材 ${index + 1}。`);
+      }
+      const blob = await response.blob();
+      const filename = decodeURIComponent(src.split("/").pop()?.split("?")[0] || `image_${index + 1}`);
+      const extension = filename.split(".").pop()?.toLowerCase();
+      const fallbackType = extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+      return new File([blob], filename, { type: blob.type || fallbackType });
+    }),
+  );
 }
 
 function countField() {
@@ -1737,6 +1846,7 @@ function openJobResult(index) {
   const job = memberJobs[index];
   if (!job) return;
   const system = systems.find((item) => item.id === job.system_id) || getActiveSystem();
+  if (activeId === "A9-3" && system.id !== activeId) a93PresetLoadVersion += 1;
   activeId = system.id;
   renderApp();
 
