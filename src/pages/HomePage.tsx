@@ -46,7 +46,7 @@ function FeaturePage({
       <div className="mx-auto max-w-6xl px-6 py-20">
         <div className="mb-10">
           <div className="text-sm uppercase tracking-[0.2em] text-indigo-300/70">
-            AI Workflow System
+            AI Architectural System
           </div>
 
           <h1 className="mt-4 text-5xl font-bold">
@@ -65,7 +65,7 @@ function FeaturePage({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm uppercase tracking-[0.2em] text-indigo-300/60">
-                  Workflow Guide
+                  Operation Guide
                 </div>
 
                 <div className="mt-2 text-2xl font-bold text-white">
@@ -514,7 +514,7 @@ export default function HomePage() {
 
   const currentTheme = themes[theme]
 
-  const workflows = [
+  const systemDefinitions = [
     {
       id: 'A1',
       title: 'Prompt Basic',
@@ -588,7 +588,7 @@ export default function HomePage() {
     {
       id: 'A8',
       title: 'Full Control Mode',
-      subtitle: '全控制建築工作流',
+      subtitle: '全控制建築操作',
       description: '多模型整合控制',
       resultType: 'image',
       inputs: ['Sketch Upload', 'Style Upload', 'Site Upload', 'Depth Upload'],
@@ -607,7 +607,7 @@ export default function HomePage() {
     },
   ]
 
-  const currentPage = workflows.find((w) => w.id === page)
+  const currentPage = systemDefinitions.find((w) => w.id === page)
 
   if (currentPage) {
     return (
@@ -667,7 +667,7 @@ export default function HomePage() {
 
         <div className="mt-20 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
           
-          {workflows.map((item) => (
+          {systemDefinitions.map((item) => (
             <button
               key={item.id}
               onClick={() => setPage(item.id)}

@@ -113,7 +113,7 @@ const systems = [
     activeTitle: "A6-2｜Creative Multi-View",
     title: "Creative Multi-View",
     subtitle: "單張圖AI產生8個經典視角",
-    desc: "使用較高精度的多視角工作流，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
+    desc: "使用較高精度的多視角處理方式，從一張完成渲染圖生成 8 個不同角度，適合重視立面一致性與透視細節的提案。",
     tier: "會員",
     status: "Live System",
     result: "image",
@@ -208,13 +208,13 @@ const systems = [
     status: "Live System",
     result: "video",
     inputs: [
-      { key: "image_1", label: "關鍵圖 1 / Start", optional: true, defaultLabel: "使用 workflow 預載圖 1，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/01.jpg" },
-      { key: "image_2", label: "關鍵圖 2", optional: true, defaultLabel: "使用 workflow 預載圖 2，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/02.jpg" },
-      { key: "image_3", label: "關鍵圖 3", optional: true, defaultLabel: "使用 workflow 預載圖 3，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/03.jpg" },
-      { key: "image_4", label: "關鍵圖 4", optional: true, defaultLabel: "使用 workflow 預載圖 4，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/04.jpg" },
-      { key: "image_5", label: "關鍵圖 5", optional: true, defaultLabel: "使用 workflow 預載圖 5，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/05.jpg" },
-      { key: "image_6", label: "關鍵圖 6", optional: true, defaultLabel: "使用 workflow 預載圖 6，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/06.jpg" },
-      { key: "image_7", label: "關鍵圖 7 / End", optional: true, defaultLabel: "使用 workflow 預載圖 7，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/07.jpg" },
+      { key: "image_1", label: "關鍵圖 1 / Start", optional: true, defaultLabel: "已載入操作範例圖 1，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/01.jpg" },
+      { key: "image_2", label: "關鍵圖 2", optional: true, defaultLabel: "已載入操作範例圖 2，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/02.jpg" },
+      { key: "image_3", label: "關鍵圖 3", optional: true, defaultLabel: "已載入操作範例圖 3，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/03.jpg" },
+      { key: "image_4", label: "關鍵圖 4", optional: true, defaultLabel: "已載入操作範例圖 4，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/04.jpg" },
+      { key: "image_5", label: "關鍵圖 5", optional: true, defaultLabel: "已載入操作範例圖 5，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/05.jpg" },
+      { key: "image_6", label: "關鍵圖 6", optional: true, defaultLabel: "已載入操作範例圖 6，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/06.jpg" },
+      { key: "image_7", label: "關鍵圖 7 / End", optional: true, defaultLabel: "已載入操作範例圖 7，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/07.jpg" },
     ],
     count: false,
     prompt: false,
@@ -1061,7 +1061,7 @@ function uploadField(input) {
         src
           ? `<img src="${src}" alt="${escapeHtml(input.label)} preview" />`
           : defaultSrc
-            ? `<img src="${escapeHtml(defaultSrc)}" alt="${escapeHtml(input.label)} workflow preview" />`
+            ? `<img src="${escapeHtml(defaultSrc)}" alt="${escapeHtml(input.label)} preset preview" />`
             : `<span>${escapeHtml(placeholder)}</span>`
       }
       <input type="file" accept="image/png,image/jpeg,image/webp" aria-label="${input.label}" />
@@ -1095,7 +1095,7 @@ const A9_PROMPT_PRESETS = {
   orbit: A9_ORBIT_PROMPT,
 };
 
-const A9_3_WORKFLOW_PROMPTS = [
+const A9_3_OPERATION_PROMPTS = [
   "",
   "施工機具由施工圍籬外側進入基地，並且開始運作整理地形。",
   "增加地下室開挖深度，並且架設水平支撐",
@@ -1150,14 +1150,14 @@ const A9_3_SITE_LOCATION_IMAGES = [
   "./assets/workflow-defaults/a9-3/site-location/S07.png",
 ];
 
-const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_WORKFLOW_PROMPTS.map((value, index) => ({
+const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_OPERATION_PROMPTS.map((value, index) => ({
   key: `prompt_${index + 1}`,
   label: `轉場提示詞 ${index + 1}：圖 ${index + 1} 到圖 ${index + 2}`,
   value,
 }));
 
 const A9_3_TRANSITION_PROMPT_PRESETS = {
-  workflow: A9_3_WORKFLOW_PROMPTS,
+  operation: A9_3_OPERATION_PROMPTS,
   construction: A9_3_CONSTRUCTION_PROMPTS,
   massing: A9_3_MASSING_PROMPTS,
   facade: A9_3_FACADE_PROMPTS,
@@ -1294,7 +1294,7 @@ const OPERATION_GUIDES = {
   A4: "./assets/operation-guides/A4.jpg",
   A5: "./assets/operation-guides/A5.jpg",
   "A6-1": "./assets/operation-guides/A6-1.jpg",
-  "A6-2": "./assets/operation-guides/A6-2.jpg",
+  "A6-2": "./assets/operation-guides/A6-2-operation.png",
   A7: "./assets/operation-guides/A7.jpg",
   "A7-1": "./assets/operation-guides/A7-1.jpg",
   "A8-1": "./assets/operation-guides/A8-1.jpg",
@@ -1370,7 +1370,7 @@ function transitionPromptFields(system) {
     <label>A9-3 圖面之間引導提示詞</label>
     <div class="prompt-presets" aria-label="A9-3 推薦提示詞">
       <span>推薦提示詞</span>
-      <button type="button" data-transition-preset="workflow">1. 工作流範例</button>
+      <button type="button" data-transition-preset="operation">1. 操作範例</button>
       <button type="button" data-transition-preset="construction">2. 施工成長</button>
       <button type="button" data-transition-preset="massing">3. 量體變形</button>
       <button type="button" data-transition-preset="facade">4. 立面完成</button>
@@ -1398,7 +1398,7 @@ function transitionPromptFields(system) {
   wrapper.querySelectorAll("[data-transition-preset]").forEach((button) => {
     button.addEventListener("click", async () => {
       const presetKey = button.dataset.transitionPreset;
-      const values = A9_3_TRANSITION_PROMPT_PRESETS[presetKey] || A9_3_WORKFLOW_PROMPTS;
+      const values = A9_3_TRANSITION_PROMPT_PRESETS[presetKey] || A9_3_OPERATION_PROMPTS;
       const imageSources = A9_3_TRANSITION_IMAGE_PRESETS[presetKey];
       if (!imageSources) {
         a93PresetLoadVersion += 1;
