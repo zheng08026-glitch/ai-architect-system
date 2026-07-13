@@ -208,13 +208,13 @@ const systems = [
     status: "Live System",
     result: "video",
     inputs: [
-      { key: "image_1", label: "關鍵圖 1 / Start", optional: true, defaultLabel: "已載入操作範例圖 1，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/01.jpg" },
-      { key: "image_2", label: "關鍵圖 2", optional: true, defaultLabel: "已載入操作範例圖 2，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/02.jpg" },
-      { key: "image_3", label: "關鍵圖 3", optional: true, defaultLabel: "已載入操作範例圖 3，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/03.jpg" },
-      { key: "image_4", label: "關鍵圖 4", optional: true, defaultLabel: "已載入操作範例圖 4，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/04.jpg" },
-      { key: "image_5", label: "關鍵圖 5", optional: true, defaultLabel: "已載入操作範例圖 5，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/05.jpg" },
-      { key: "image_6", label: "關鍵圖 6", optional: true, defaultLabel: "已載入操作範例圖 6，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/06.jpg" },
-      { key: "image_7", label: "關鍵圖 7 / End", optional: true, defaultLabel: "已載入操作範例圖 7，可直接更換", defaultSrc: "./assets/workflow-defaults/a9-3/07.jpg" },
+      { key: "image_1", label: "關鍵圖 1 / Start", optional: true },
+      { key: "image_2", label: "關鍵圖 2", optional: true },
+      { key: "image_3", label: "關鍵圖 3", optional: true },
+      { key: "image_4", label: "關鍵圖 4", optional: true },
+      { key: "image_5", label: "關鍵圖 5", optional: true },
+      { key: "image_6", label: "關鍵圖 6", optional: true },
+      { key: "image_7", label: "關鍵圖 7 / End", optional: true },
     ],
     count: false,
     prompt: false,
@@ -1095,14 +1095,7 @@ const A9_PROMPT_PRESETS = {
   orbit: A9_ORBIT_PROMPT,
 };
 
-const A9_3_OPERATION_PROMPTS = [
-  "",
-  "施工機具由施工圍籬外側進入基地，並且開始運作整理地形。",
-  "增加地下室開挖深度，並且架設水平支撐",
-  "由筏基底板逐層建設到一樓樓地版",
-  "逐層增高的建築物，塔吊也隨之增加高度。",
-  "建築物體固定不動，先拆除塔吊後，外牆立面由上往下改變表面狀態。",
-];
+const A9_3_EMPTY_PROMPTS = Array(6).fill("");
 
 const A9_3_CONSTRUCTION_PROMPTS = [
   "基地由現況逐步轉為施工準備狀態，施工圍籬與臨時設施出現。",
@@ -1150,14 +1143,14 @@ const A9_3_SITE_LOCATION_IMAGES = [
   "./assets/workflow-defaults/a9-3/site-location/S07.png",
 ];
 
-const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_OPERATION_PROMPTS.map((value, index) => ({
+const A9_3_TRANSITION_PROMPT_FIELDS = A9_3_EMPTY_PROMPTS.map((value, index) => ({
   key: `prompt_${index + 1}`,
   label: `轉場提示詞 ${index + 1}：圖 ${index + 1} 到圖 ${index + 2}`,
   value,
 }));
 
 const A9_3_TRANSITION_PROMPT_PRESETS = {
-  operation: A9_3_OPERATION_PROMPTS,
+  reset: A9_3_EMPTY_PROMPTS,
   construction: A9_3_CONSTRUCTION_PROMPTS,
   massing: A9_3_MASSING_PROMPTS,
   facade: A9_3_FACADE_PROMPTS,
@@ -1370,7 +1363,7 @@ function transitionPromptFields(system) {
     <label>A9-3 圖面之間引導提示詞</label>
     <div class="prompt-presets" aria-label="A9-3 推薦提示詞">
       <span>推薦提示詞</span>
-      <button type="button" data-transition-preset="operation">1. 操作範例</button>
+      <button type="button" data-transition-preset="reset">1. 重新設置</button>
       <button type="button" data-transition-preset="construction">2. 施工成長</button>
       <button type="button" data-transition-preset="massing">3. 量體變形</button>
       <button type="button" data-transition-preset="facade">4. 立面完成</button>
@@ -1398,14 +1391,20 @@ function transitionPromptFields(system) {
   wrapper.querySelectorAll("[data-transition-preset]").forEach((button) => {
     button.addEventListener("click", async () => {
       const presetKey = button.dataset.transitionPreset;
-      const values = A9_3_TRANSITION_PROMPT_PRESETS[presetKey] || A9_3_OPERATION_PROMPTS;
+      const values = A9_3_TRANSITION_PROMPT_PRESETS[presetKey] || A9_3_EMPTY_PROMPTS;
       const imageSources = A9_3_TRANSITION_IMAGE_PRESETS[presetKey];
       if (!imageSources) {
         a93PresetLoadVersion += 1;
+        system.inputs.forEach((input) => {
+          const key = `${system.id}-${input.key}`;
+          previews.delete(key);
+          uploadedFiles.delete(key);
+        });
         wrapper.querySelectorAll("[data-transition-prompt]").forEach((textarea, index) => {
           textarea.value = values[index] || "";
           transitionPromptValues.set(`${system.id}-${textarea.dataset.transitionPrompt}`, textarea.value);
         });
+        renderApp();
         return;
       }
 
