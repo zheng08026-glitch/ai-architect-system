@@ -1133,6 +1133,16 @@ const A9_3_SITE_LOCATION_PROMPTS = [
   "鳥瞰圖漸漸轉成TOP VIEW，同時顯示出基地範圍、面積、尺寸。",
 ];
 
+const A9_3_CONSTRUCTION_IMAGES = [
+  "./assets/workflow-defaults/a9-3/01.jpg",
+  "./assets/workflow-defaults/a9-3/02.jpg",
+  "./assets/workflow-defaults/a9-3/03.jpg",
+  "./assets/workflow-defaults/a9-3/04.jpg",
+  "./assets/workflow-defaults/a9-3/05.jpg",
+  "./assets/workflow-defaults/a9-3/06.jpg",
+  "./assets/workflow-defaults/a9-3/07.jpg",
+];
+
 const A9_3_SITE_LOCATION_IMAGES = [
   "./assets/workflow-defaults/a9-3/site-location/S01.png",
   "./assets/workflow-defaults/a9-3/site-location/S02.jpg",
@@ -1158,6 +1168,7 @@ const A9_3_TRANSITION_PROMPT_PRESETS = {
 };
 
 const A9_3_TRANSITION_IMAGE_PRESETS = {
+  construction: A9_3_CONSTRUCTION_IMAGES,
   siteLocation: A9_3_SITE_LOCATION_IMAGES,
 };
 
