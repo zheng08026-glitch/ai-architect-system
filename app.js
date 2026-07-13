@@ -235,7 +235,7 @@ const gridSystems = [
     id: "A2",
     targetId: "A2-1",
     title: "One-Click Rendering",
-    subtitle: "一鍵渲染透視、平面",
+    subtitle: "一張圖一鍵渲染 - 擬真透視/平面",
   },
   systems.find((system) => system.id === "A3"),
   systems.find((system) => system.id === "A4"),
@@ -245,23 +245,26 @@ const gridSystems = [
     id: "A6",
     targetId: "A6-1",
     title: "Creative Multi-View",
+    subtitle: "一張圖產生8視角 - 2套共16視角",
   },
   {
     ...systems.find((system) => system.id === "A7-1"),
     id: "A7",
     targetId: "A7-1",
     title: "Style PLUS",
-    subtitle: "建築形體隨風格圖變形",
+    subtitle: "建築形體變形 融合 風格圖",
   },
   {
     ...systems.find((system) => system.id === "A8-1"),
     id: "A8",
     targetId: "A8-1",
+    subtitle: "圖片畫質提升",
   },
   {
     ...systems.find((system) => system.id === "A9-1"),
     id: "A9",
     targetId: "A9-1",
+    subtitle: "AI圖像轉動畫",
   },
 ];
 
