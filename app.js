@@ -138,6 +138,19 @@ const systems = [
     prompt: false,
   },
   {
+    id: "A7-2",
+    activeTitle: "A7-2｜Biomimetic Architecture",
+    title: "Biomimetic Architecture",
+    subtitle: "擬態／仿生建築轉化",
+    desc: "上傳動物、昆蟲或植物參考圖，搭配仿生建築提示詞，將其形態轉譯為可使用的建築空間與結構。",
+    tier: "會員",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "image", label: "動物／昆蟲／植物參考圖" }],
+    count: false,
+    prompt: true,
+  },
+  {
     id: "A8-1",
     gridDisplayId: "A8",
     title: "HD Enhance",
@@ -252,7 +265,7 @@ const gridSystems = [
     id: "A7",
     targetId: "A7-1",
     title: "Style PLUS",
-    subtitle: "建築形體變形 融合 風格圖",
+    subtitle: "風格融合與仿生建築轉化",
   },
   {
     ...systems.find((system) => system.id === "A8-1"),
@@ -275,7 +288,7 @@ const sidebarGroups = [
   { id: "A4", systemId: "A4" },
   { id: "A5", systemId: "A5" },
   { id: "A6", title: "Creative Multi-View", summary: "多角度透視", childIds: ["A6-1", "A6-2"] },
-  { id: "A7", title: "Style PLUS", summary: "風格量體變形", childIds: ["A7-1"] },
+  { id: "A7", title: "Style PLUS", summary: "風格融合／仿生轉化", childIds: ["A7-1", "A7-2"] },
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
@@ -1292,6 +1305,66 @@ Elegant presentation.
 Nordic design.`,
 };
 
+const A7_2_PROMPT_PRESETS = {
+  animal: [
+    "A monumental biomimetic architectural megastructure inspired by the anatomy and silhouette of a [ANIMAL], transformed into a fully habitable building rather than a sculpture.",
+    "The animal's body is reinterpreted as a multi-level architectural complex, with large transparent glass curtain walls, curved steel space-frame structures, exposed structural ribs, visible floor slabs, interior atriums, public galleries, offices and observation decks.",
+    "Different parts of the animal's body contain usable interior spaces and are connected by elevated pedestrian bridges, skywalks, ramps and enclosed circulation corridors. The legs or lower body function as structural cores, entrances, elevators and vertical circulation towers.",
+    "Highly detailed steel-and-glass construction, realistic architectural joints, structural logic, curtain-wall mullions, occupied interiors visible through the glazing, warm interior lighting, people walking inside and across the bridges.",
+    "Monumental scale, surrounded by wetlands, forest and reflective water, cinematic aerial architectural photography, photorealistic, ultra-detailed, realistic construction, contemporary futuristic architecture, organic architecture, high-end architectural visualization.",
+  ].join("\n\n"),
+  plant: [
+    "A monumental biomimetic architectural complex inspired by the geometry and growth pattern of a [PLANT], transformed into a fully habitable multi-level building.",
+    "The botanical form is reinterpreted through contemporary architectural structure: the [PLANT PART] become large curved roof canopies, transparent glass curtain walls and layered occupied floor plates. The central stem becomes a structural circulation core containing elevators, staircases and building services.",
+    "Visible interior floors, public galleries, offices, restaurants, indoor gardens and observation decks behind the transparent facade. Different architectural volumes are connected by elevated pedestrian bridges, enclosed glass corridors, curved ramps and landscaped walkways.",
+    "Large-span steel space-frame structure, branching structural columns, exposed structural ribs, realistic curtain-wall mullions, believable construction joints and functional entrances.",
+    "Monumental architectural scale, tiny people and vehicles for scale, surrounded by water, forest and landscaped gardens, aerial three-quarter view, wide establishing shot, entire building visible, photorealistic architectural visualization, ultra-detailed, realistic structural engineering.",
+  ].join("\n\n"),
+  elephant: [
+    "A colossal elephant-inspired architectural megastructure standing in a lush wetland landscape, designed as a fully habitable public building rather than an elephant statue.",
+    "The elephant's torso forms a vast multi-story glass atrium covered by a transparent curved glass curtain wall and a silver steel space-frame exoskeleton. The back contains several large interior floors, public exhibition halls, offices, gardens and observation decks, clearly visible through the glass facade.",
+    "The four legs are redesigned as massive structural towers containing entrances, elevators, stairs, service cores and vertical circulation. The trunk becomes an enclosed elevated promenade and panoramic gallery, gently curving downward toward a circular entrance pavilion. The ears become huge translucent glass canopies supported by structural ribs.",
+    "Multiple elevated pedestrian bridges, skywalks and curved ramps connect the elephant building to surrounding landscape pavilions and neighboring structures. Realistic steel joints, curtain-wall mullions, floor slabs, structural columns, occupied interiors, tiny people walking on the bridges, vehicles near the entrance for scale.",
+    "Monumental biomimetic architecture, organic steel-and-glass design, believable structural engineering, futuristic architectural landmark, lush forest, wetland and reflective water, cinematic aerial view, architectural photography, photorealistic, extremely detailed, realistic materials, high-end architectural visualization.",
+  ].join("\n\n"),
+  beetle: [
+    "A gigantic beetle-inspired architectural complex, transformed into a fully habitable cultural center rather than a giant insect sculpture.",
+    "The beetle's hard shell becomes two enormous curved glass-and-metal roof structures, partially opened to reveal a multi-level interior atrium. The shell is supported by a sophisticated steel exoskeleton with visible structural ribs, space frames and curtain-wall mullions.",
+    "The insect's segmented body contains exhibition halls, offices, restaurants and indoor gardens. Its six legs become structural entrance towers, stair cores and elevated supports. Multiple skybridges and enclosed glass walkways connect the body segments and surrounding landscape pavilions.",
+    "Transparent glass curtain walls, realistic floors visible inside, people walking through the atrium, suspended platforms, bridges and observation decks, believable architectural engineering, monumental scale, futuristic biomimetic architecture, surrounded by forest and water, cinematic aerial view, photorealistic architectural visualization.",
+  ].join("\n\n"),
+  butterfly: [
+    "A monumental butterfly-inspired airport terminal and cultural complex, designed as a fully occupiable building rather than a butterfly sculpture.",
+    "The butterfly wings are transformed into enormous lightweight glass roofs supported by branching steel space frames. Each wing contains multi-level public halls, galleries and indoor gardens. The central body functions as the main circulation spine with elevators, escalators and a large transparent atrium.",
+    "Elevated pedestrian bridges, suspended walkways and enclosed glass corridors connect both wings. Realistic curtain-wall systems, structural ribs, floor slabs, interior lighting and occupied public spaces. Tiny people and vehicles emphasize the enormous architectural scale.",
+    "Elegant biomimetic architecture, organic structural engineering, steel and glass, futuristic landmark, aerial architectural photography, photorealistic, highly detailed.",
+  ].join("\n\n"),
+  lotus: [
+    "A monumental lotus-flower-inspired cultural center floating above a landscaped wetland, designed as a fully habitable multi-level architectural complex.",
+    "The blooming lotus petals are transformed into a series of enormous curved glass-and-steel roof structures. Each petal contains occupied interior spaces, exhibition galleries, performance halls, restaurants and elevated viewing terraces.",
+    "The petals are constructed with transparent glass curtain walls, silver steel space-frame structures and elegant branching structural ribs. Visible floor slabs, interior staircases, suspended platforms and people can be clearly seen behind the transparent facade.",
+    "The center of the lotus forms a vast circular atrium with a skylight, vertical gardens, elevators and spiral circulation ramps. The central stem becomes a structural core extending down into the water and containing vertical circulation and building services.",
+    "Large circular lotus-leaf-shaped pavilions float around the main building. They are connected by elevated pedestrian bridges, curved glass corridors and landscaped walkways above the water.",
+    "Contemporary biomimetic architecture, realistic structural engineering, believable glass curtain-wall construction, monumental scale, tiny people and vehicles for scale, reflective water, lush wetlands and forest, aerial three-quarter view, wide architectural photography, photorealistic, ultra-detailed, high-end architectural visualization.",
+  ].join("\n\n"),
+  seedpod: [
+    "A monumental lotus-seedpod-inspired mixed-use architectural tower, designed as a fully habitable building with realistic structural engineering.",
+    "The rounded seedpod form becomes a large multi-level steel-and-glass architectural volume. Its circular openings are transformed into recessed panoramic windows, sky gardens, observation terraces and illuminated interior atriums.",
+    "The facade consists of transparent and semi-transparent glass curtain walls, metallic structural rings, deep circular window frames and branching load-bearing columns. Multiple occupied floor slabs, offices, galleries, restaurants and indoor gardens are visible through the facade.",
+    "A central structural stem supports the building and contains elevators, stairs and mechanical services. Elevated pedestrian bridges connect the main seedpod tower to smaller lotus-leaf-shaped pavilions floating above a reflective wetland landscape.",
+    "Believable architectural construction, realistic structural joints, monumental biomimetic design, tiny people and vehicles for scale, cinematic aerial architectural photography, photorealistic, ultra-detailed.",
+  ].join("\n\n"),
+  christmasTree: [
+    "A monumental conical mixed-use tower inspired by the layered geometry of a Christmas tree, designed as a fully habitable contemporary architectural landmark.",
+    "The building consists of multiple stacked and gradually receding circular floor plates, forming an elegant tree-like silhouette. Each level contains offices, hotels, restaurants, public galleries and landscaped sky terraces.",
+    "A massive central structural core functions as the trunk, containing elevators, staircases and building services. Branch-like steel structures extend outward from the core to support the cantilevered floors and terraces.",
+    "The exterior is enclosed by large transparent glass curtain walls, curved metallic structural frames and integrated vertical greenery. Visible occupied interior floors, warm interior lighting, people, furniture and circulation spaces can be clearly seen through the facade.",
+    "A continuous spiral pedestrian promenade wraps around the building like a ribbon, connecting the sky gardens, observation decks and public terraces. Several elevated glass bridges connect the tower to surrounding pavilions.",
+    "The top of the tower contains an illuminated geometric observation deck and architectural crown. Sophisticated festive lighting integrated into the facade, elegant and restrained, contemporary architecture rather than decorative installation.",
+    "Realistic structural engineering, monumental scale, people and vehicles for scale, urban park landscape, cinematic dusk architectural photography, aerial three-quarter view, photorealistic, ultra-detailed, high-end architectural visualization.",
+  ].join("\n\n"),
+};
+
 const OPERATION_GUIDES = {
   "A1-1": "./assets/operation-guides/A1-1.jpg",
   "A1-2": "./assets/operation-guides/A1-2.jpg",
@@ -1316,14 +1389,25 @@ function textPromptField(system) {
   wrapper.className = "field-box";
   const isA9 = system.id === "A9-1";
   const isA2FloorPlan = system.id === "A2-2";
+  const isA7Biomimetic = system.id === "A7-2";
   wrapper.innerHTML = `
-    <label for="customPrompt">${isA9 ? "影像提示詞" : isA2FloorPlan ? "風格與圖形狀況提詞" : "建築提示詞"}</label>
+    <label for="customPrompt">${
+      isA9
+        ? "影像提示詞"
+        : isA2FloorPlan
+          ? "風格與圖形狀況提詞"
+          : isA7Biomimetic
+            ? "仿生建築提示詞"
+            : "建築提示詞"
+    }</label>
     <textarea id="customPrompt" placeholder="${
       isA9
         ? "描述鏡頭方向、運動方式、光線與動畫氛圍..."
         : isA2FloorPlan
           ? "請選擇下方提詞選項，或直接在此編輯內容。"
-        : "例如：低樓層集合住宅、清水混凝土、深窗框、街角基地、柔和日光..."
+          : isA7Biomimetic
+            ? "請選擇下方仿生建築範本，或直接輸入想轉化的動物、昆蟲或植物形態。"
+            : "例如：低樓層集合住宅、清水混凝土、深窗框、街角基地、柔和日光..."
     }"></textarea>
     ${
       isA9
@@ -1337,7 +1421,24 @@ function textPromptField(system) {
             <button type="button" disabled>5. 待更新</button>
           </div>
         `
-        : isA2FloorPlan
+        : isA7Biomimetic
+          ? `
+          <div class="prompt-presets" aria-label="A7-2 仿生建築輔助提詞">
+            <span>輔助提詞</span>
+            <button type="button" data-biomimetic-preset="reset">重新設置</button>
+            <button type="button" data-biomimetic-preset="animal">1. 仿生建築－通用動物</button>
+            <button type="button" data-biomimetic-preset="plant">2. 仿生建築－通用植物</button>
+            <button type="button" data-biomimetic-preset="elephant">3. 仿生建築－大象</button>
+            <button type="button" data-biomimetic-preset="beetle">4. 仿生建築－甲蟲</button>
+            <button type="button" data-biomimetic-preset="butterfly">5. 仿生建築－蝴蝶</button>
+            <button type="button" data-biomimetic-preset="lotus">6. 仿生建築－荷花／蓮花</button>
+            <button type="button" data-biomimetic-preset="seedpod">7. 仿生建築－蓮蓬</button>
+            <button type="button" data-biomimetic-preset="christmasTree">8. 仿生建築－耶誕樹</button>
+            <button type="button" disabled>9. 待更新</button>
+            <button type="button" disabled>10. 待更新</button>
+          </div>
+        `
+          : isA2FloorPlan
           ? `
           <div class="prompt-presets" aria-label="平面上色提詞預設">
             <span>提詞預設</span>
@@ -1363,6 +1464,13 @@ function textPromptField(system) {
     button.addEventListener("click", () => {
       wrapper.querySelector("#customPrompt").value =
         A2_FLOOR_PLAN_PROMPT_PRESETS[button.dataset.floorPlanPreset] || "";
+      wrapper.querySelector("#customPrompt").focus();
+    });
+  });
+  wrapper.querySelectorAll("[data-biomimetic-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = button.dataset.biomimeticPreset;
+      wrapper.querySelector("#customPrompt").value = preset === "reset" ? "" : A7_2_PROMPT_PRESETS[preset] || "";
       wrapper.querySelector("#customPrompt").focus();
     });
   });
