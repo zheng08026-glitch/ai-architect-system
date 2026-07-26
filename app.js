@@ -1426,8 +1426,14 @@ function textPromptField(system) {
           <div class="prompt-presets" aria-label="A7-2 仿生建築輔助提詞">
             <span>輔助提詞</span>
             <button type="button" data-biomimetic-preset="reset">重新設置</button>
-            <button type="button" data-biomimetic-preset="animal">1. 仿生建築－通用動物</button>
-            <button type="button" data-biomimetic-preset="plant">2. 仿生建築－通用植物</button>
+            <button class="prompt-preset-with-hint" type="button" data-biomimetic-preset="animal">
+              <span>1. 仿生建築－通用動物</span>
+              <small>自行修改 [ANIMAL]</small>
+            </button>
+            <button class="prompt-preset-with-hint" type="button" data-biomimetic-preset="plant">
+              <span>2. 仿生建築－通用植物</span>
+              <small>自行修改 [PLANT]、[PLANT PART]</small>
+            </button>
             <button type="button" data-biomimetic-preset="elephant">3. 仿生建築－大象</button>
             <button type="button" data-biomimetic-preset="beetle">4. 仿生建築－甲蟲</button>
             <button type="button" data-biomimetic-preset="butterfly">5. 仿生建築－蝴蝶</button>

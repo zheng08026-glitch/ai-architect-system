@@ -1121,6 +1121,20 @@ textarea {
   font-weight: 750;
 }
 
+.prompt-presets .prompt-preset-with-hint {
+  display: grid;
+  gap: 3px;
+  min-height: 56px;
+  padding: 7px 10px;
+  line-height: 1.2;
+}
+
+.prompt-presets .prompt-preset-with-hint small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .prompt-presets button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
