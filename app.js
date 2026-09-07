@@ -308,6 +308,7 @@ const previews = new Map();
 const uploadedFiles = new Map();
 const a10RequestKeys = new WeakMap();
 let a10Submitting = false;
+let a10DrawingUnit = "cm";
 let a10Watching = "";
 const transitionPromptValues = new Map();
 let a93PresetLoadVersion = 0;
@@ -1091,9 +1092,20 @@ function a10UploadField() {
   wrapper.className = "upload-box";
   const file = uploadedFiles.get("A10-dxf");
   wrapper.innerHTML = `<span class="upload-label">建築圖面 DXF（最大 50 MB）</span>
+    <label>圖面單位 <select aria-label="圖面單位" data-a10-unit>
+      <option value="cm">公分（cm）</option><option value="mm">毫米（mm）</option><option value="m">公尺（m）</option>
+    </select></label><small>預設公分，請確認原圖單位；選錯會造成模型尺寸錯誤。數字的用途仍依圖面位置判讀。</small>
     <label class="drop-zone a10-drop-zone"><span>${file ? escapeHtml(file.name) : "選擇或拖入 DXF 檔案"}</span>
     <small>${file ? `${(file.size / 1024 / 1024).toFixed(2)} MB・點此更換` : "可包含平面、立面與剖面。不接受 DWG / ZIP / RB。"}</small>
     <input type="file" accept=".dxf" aria-label="上傳建築 DXF" /></label><p class="generation-notice" role="status"></p>`;
+  const unitSelect = wrapper.querySelector("[data-a10-unit]");
+  unitSelect.value = a10DrawingUnit;
+  unitSelect.disabled = a10Submitting;
+  unitSelect.addEventListener("change", () => {
+    a10DrawingUnit = unitSelect.value;
+    const current = uploadedFiles.get("A10-dxf");
+    if (current) a10RequestKeys.set(current, crypto.randomUUID());
+  });
   const select = (candidate) => {
     const message = wrapper.querySelector('[role="status"]');
     if (!candidate) return;
@@ -1114,6 +1126,9 @@ function a10UploadField() {
 
 async function a10Response(response) {
   if (response.ok) return response.json();
+  const detail = await response.json().catch(() => ({}));
+  if (detail.detail === "A10_UNIT_CONFLICT") throw new Error("DXF 宣告單位與所選單位不同，本次未建立任務、未扣額。請確認原圖單位後更正選項；若檔案宣告錯誤，請先由 CAD 修正後匯出。");
+  if (detail.detail === "A10_INVALID_UNIT") throw new Error("請選擇公分、毫米或公尺。");
   // Small public categories; never display raw proxy, engine, or filesystem diagnostics.
   const messages = { 400: "請檢查 DXF 格式與檔案內容。", 401: "請先登入會員，或重新登入後再試。",
     403: "此帳號目前無法使用 A10，請聯絡管理員。", 404: "找不到任務或沒有存取權限。",
@@ -1132,16 +1147,21 @@ async function submitA10() {
   }
   const file = uploadedFiles.get("A10-dxf");
   if (!file) throw new Error("請先上傳建築 DXF 檔案。");
+  const selectedUnit = a10DrawingUnit;
+  if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
+  const selectedRequestKey = a10RequestKeys.get(file);
   a10Submitting = true;
   const button = inputStack.querySelector(".generate-button");
   if (button) button.disabled = true;
   try {
     const config = await a10Response(await fetch(`${getApiBase()}/api/a10/config`));
     if (!config.enabled) throw new Error("A10 建模服務尚未啟用，請等待主機驗證完成。");
+    if (!config.drawing_units?.includes(selectedUnit)) throw new Error("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
     if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
     const form = new FormData();
     form.append("dxf", file);
-    form.append("request_key", a10RequestKeys.get(file));
+    form.append("drawing_unit", selectedUnit);
+    form.append("request_key", selectedRequestKey);
     const data = await a10Response(await fetch(`${getApiBase()}/api/a10/jobs`, {
       method: "POST", headers: getAuthHeaders(), body: form,
     }));
@@ -1172,7 +1192,10 @@ async function watchA10(jobId) {
     failures = 0;
     if (a10Watching !== watch || activeId !== "A10") return;
     if (job.status === "completed") { setA10Result(job); loadMemberCenter().catch(() => {}); return; }
-    if (job.status === "failed") throw new Error("建模未完成，系統已保留紀錄，請聯絡管理員。");
+    if (job.status === "failed") {
+      if (["A10_UNIT_CONFLICT", "A10_UNIT_UNRESOLVED"].includes(job.error_code)) throw new Error("圖面單位需要確認，請聯絡管理員檢查此任務；不要重複送件。");
+      throw new Error("建模未完成，系統已保留紀錄，請聯絡管理員。");
+    }
     const labels = { queued: "等待建模主機", analyzing: "分析 DXF 圖面", modeling: "建立 SketchUp 模型",
       checking: "檢查模型成果", uploading: "回傳模型檔案" };
     const percent = Math.max(0, Math.min(99, Number(job.progress_percent) || 0));
@@ -1823,7 +1846,7 @@ function renderHowToUse(system) {
     textGuide.innerHTML = `<p><strong>2D to 3D｜DXF to Skp · 整合測試版</strong></p>
       <ol>
         <li>登入會員，確認 A10 獨立額度。A10 不包含於 A1–A9 的既有額度。</li>
-        <li>上傳建築 DXF（上限 50 MB）。建議包含平面、立面與剖面；目前不接受 DWG、PDF 或圖片作為輸入。</li>
+        <li>上傳建築 DXF（上限 50 MB），確認圖面單位：預設公分，可改毫米或公尺。選錯會造成模型尺寸錯誤。建議包含平面、立面與剖面；目前不接受 DWG、PDF 或圖片作為輸入。</li>
         <li>按「開始建立 3D 模型」，查看排隊與處理狀態。時間依圖面複雜度及排隊情況而定，無須重複送件。</li>
         <li>完成後下載 SKP 與建模摘要；離開頁面後，可登入會員任務紀錄取件。</li>
         <li>用 SketchUp 開啟模型，核對牆、柱、樓板及尺寸後再編輯使用。</li>
