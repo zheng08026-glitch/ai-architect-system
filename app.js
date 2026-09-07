@@ -235,6 +235,13 @@ const systems = [
   },
 ];
 
+systems.push({
+  id: "A10", activeTitle: "A10｜2D to 3D｜DXF to Skp", title: "2D to 3D",
+  subtitle: "DXF to Skp", desc: "上傳 2D 建築 DXF，分析平面、立面與剖面，建立可編輯的 SketchUp 模型。會員獨立額度，成果需複核。",
+  tier: "會員・獨立額度", status: "Live System", result: "model",
+  inputs: [{ key: "dxf", label: "建築圖面 DXF" }], count: false, prompt: false,
+});
+
 const gridSystems = [
   {
     ...systems.find((system) => system.id === "A1-1"),
@@ -292,11 +299,16 @@ const sidebarGroups = [
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
+gridSystems.push(systems.find((system) => system.id === "A10"));
+sidebarGroups.push({ id: "A10", systemId: "A10" });
 
 let activeId = "A1-1";
 let expandedSidebarGroup = null;
 const previews = new Map();
 const uploadedFiles = new Map();
+const a10RequestKeys = new WeakMap();
+let a10Submitting = false;
+let a10Watching = "";
 const transitionPromptValues = new Map();
 let a93PresetLoadVersion = 0;
 let activeResultUrl = "";
@@ -497,12 +509,14 @@ function renderMemberSummary(profileData = {}, usageData = {}) {
   const a1A8Limit = Number(a1A8Record.limit || 15);
   const a9Used = Number(a9Record.used || 0);
   const a9Limit = Number(a9Record.limit || 3);
+  const a10Record = usageData.current_usage?.a10 || records.find((record) => record.bucket === "member_a10_lifetime") || {};
   memberSummary.innerHTML = `
     <span>${email || "會員"}</span>
     <span>${plan.toUpperCase()}</span>
     ${hasAdminAccess(profileData) ? `<span>${profileData.is_primary_admin ? "PRIMARY ADMIN" : "ADMIN"}</span>` : ""}
     <span>A1-A8 本月 ${a1A8Used}/${a1A8Limit}</span>
     <span>A9 本月 ${a9Used}/${a9Limit}</span>
+    <span>A10 獨立額度 ${Number(a10Record.used || 0)}/${Number(a10Record.limit || 0)}${!a10Record.limit ? "（尚未開通）" : ""}</span>
   `;
 }
 
@@ -515,6 +529,7 @@ function renderUsageList(records = []) {
   const bucketLabels = {
     member_a1_a8_monthly: "A1-A8 本月共用額度",
     member_a9_monthly: "A9 本月額度",
+    member_a10_lifetime: "A10 累計獨立額度",
     anon_a1_a2_daily: "匿名 A1-1/A1-2 今日試用額度",
   };
   usageList.innerHTML = records
@@ -544,7 +559,7 @@ function renderJobList(records = []) {
       const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
       const videoUrls = job.output_videos || (job.output_video ? [job.output_video] : []);
       const hasResult =
-        job.status === "completed" && (imageUrls.length || videoUrls.length || job.output_text);
+        job.status === "completed" && (imageUrls.length || videoUrls.length || job.output_text || job.output_files?.length);
       const downloadUrl = imageUrls[0] || "";
       const errorMessage = getPublicJobError(job);
       return `
@@ -554,8 +569,8 @@ function renderJobList(records = []) {
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
             ${
-              hasResult
-                ? `<button type="button" class="text-button" data-open-job="${index}">查看成果</button>`
+              hasResult || (job.system_id === "A10" && ["pending", "processing", "finalizing"].includes(job.status))
+                ? `<button type="button" class="text-button" data-open-job="${index}">${hasResult ? "查看成果" : "查看進度"}</button>`
                 : ""
             }
             ${
@@ -634,6 +649,7 @@ function renderAdminMembers(records = []) {
     .map((member) => {
       const a1A8 = member.current_usage?.a1_a8 || {};
       const a9 = member.current_usage?.a9 || {};
+      const a10 = member.current_usage?.a10 || {};
       const jobs = member.job_summary || {};
       const lastActivity = formatJobTime(jobs.last_activity_at) || "No activity";
       return `
@@ -644,6 +660,7 @@ function renderAdminMembers(records = []) {
             <div class="admin-usage-summary">
               <span><strong>${Number(a1A8.remaining || 0)}</strong> A1-A8 left this month</span>
               <span><strong>${Number(a9.remaining || 0)}</strong> A9 left this month</span>
+              <span><strong>${Number(a10.remaining || 0)}</strong> A10 independent credits</span>
               <span><strong>${Number(jobs.completed || 0)}</strong> completed / ${Number(jobs.failed || 0)} failed</span>
               <span>Last activity: ${escapeHtml(lastActivity)}</span>
             </div>
@@ -678,6 +695,7 @@ function renderAdminMembers(records = []) {
             <button class="text-button" type="button" data-admin-action="grant-package">Open +50 / +5</button>
             <button class="text-button" type="button" data-admin-action="grant-jpg">JPG +10</button>
             <button class="text-button" type="button" data-admin-action="grant-mp4">MP4 +10</button>
+            <button class="text-button" type="button" data-admin-action="grant-a10">A10 +10</button>
           </div>
         </div>
       `;
@@ -843,6 +861,11 @@ async function handleAdminMemberAction(event) {
         body: JSON.stringify({
           reason: "Promotional access opened by admin",
         }),
+      });
+    } else if (action === "grant-a10") {
+      const amount = 10;
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
+        method: "POST", body: JSON.stringify({ bucket: "member_a10_lifetime", amount, reason: "A10 independent credits granted by admin" }),
       });
     } else if (action === "grant-jpg" || action === "grant-mp4") {
       const isJpgGrant = action === "grant-jpg";
@@ -1045,7 +1068,7 @@ function systemCard(system) {
   card.innerHTML = `
     <div class="system-card-top">
       <span class="system-id">${system.gridDisplayId || system.displayId || system.id}</span>
-      <span class="status-pill ${system.status === "Live System" ? "with-dot" : "pending"}">${system.status}</span>
+      <span class="status-pill ${system.status === "Live System" ? "with-dot" : "pending"}">${system.id === "A10" ? "整合測試版" : system.status}</span>
     </div>
     <h3>${system.title}</h3>
     <p>${system.subtitle}</p>
@@ -1063,7 +1086,163 @@ function systemCard(system) {
   return card;
 }
 
+function a10UploadField() {
+  const wrapper = document.createElement("div");
+  wrapper.className = "upload-box";
+  const file = uploadedFiles.get("A10-dxf");
+  wrapper.innerHTML = `<span class="upload-label">建築圖面 DXF（最大 50 MB）</span>
+    <label class="drop-zone a10-drop-zone"><span>${file ? escapeHtml(file.name) : "選擇或拖入 DXF 檔案"}</span>
+    <small>${file ? `${(file.size / 1024 / 1024).toFixed(2)} MB・點此更換` : "可包含平面、立面與剖面。不接受 DWG / ZIP / RB。"}</small>
+    <input type="file" accept=".dxf" aria-label="上傳建築 DXF" /></label><p class="generation-notice" role="status"></p>`;
+  const select = (candidate) => {
+    const message = wrapper.querySelector('[role="status"]');
+    if (!candidate) return;
+    if (!/\.dxf$/i.test(candidate.name) || candidate.size === 0 || candidate.size > 50 * 1024 * 1024) {
+      message.textContent = "請選擇非空白、50 MB 以下的 DXF 檔案。";
+      return;
+    }
+    uploadedFiles.set("A10-dxf", candidate);
+    a10RequestKeys.set(candidate, crypto.randomUUID());
+    renderApp();
+  };
+  wrapper.querySelector("input").addEventListener("change", (event) => select(event.target.files[0]));
+  const zone = wrapper.querySelector(".drop-zone");
+  zone.addEventListener("dragover", (event) => event.preventDefault());
+  zone.addEventListener("drop", (event) => { event.preventDefault(); select(event.dataTransfer.files[0]); });
+  return wrapper;
+}
+
+async function a10Response(response) {
+  if (response.ok) return response.json();
+  // Small public categories; never display raw proxy, engine, or filesystem diagnostics.
+  const messages = { 400: "請檢查 DXF 格式與檔案內容。", 401: "請先登入會員，或重新登入後再試。",
+    403: "此帳號目前無法使用 A10，請聯絡管理員。", 404: "找不到任務或沒有存取權限。",
+    409: "任務狀態已改變，請重新整理會員任務紀錄。", 413: "DXF 超過 50 MB 大小限制。",
+    429: "A10 獨立額度尚未開通或已用完，請聯絡管理員。", 503: "A10 建模服務尚未啟用，請稍後再試。" };
+  throw new Error(messages[response.status] || "A10 服務暫時無法回應，請至會員任務紀錄查看。");
+}
+
+async function submitA10() {
+  if (a10Submitting) return;
+  const system = systems.find((item) => item.id === "A10");
+  if (!getAuthToken()) {
+    authMessage.textContent = "請先登入會員後使用 A10。A10 使用獨立額度。";
+    authDialog.showModal();
+    return;
+  }
+  const file = uploadedFiles.get("A10-dxf");
+  if (!file) throw new Error("請先上傳建築 DXF 檔案。");
+  a10Submitting = true;
+  const button = inputStack.querySelector(".generate-button");
+  if (button) button.disabled = true;
+  try {
+    const config = await a10Response(await fetch(`${getApiBase()}/api/a10/config`));
+    if (!config.enabled) throw new Error("A10 建模服務尚未啟用，請等待主機驗證完成。");
+    if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
+    const form = new FormData();
+    form.append("dxf", file);
+    form.append("request_key", a10RequestKeys.get(file));
+    const data = await a10Response(await fetch(`${getApiBase()}/api/a10/jobs`, {
+      method: "POST", headers: getAuthHeaders(), body: form,
+    }));
+    if (activeId === "A10") showResultMessage(system, "任務已送出，正在等待建模主機。關閉此頁不會取消任務。");
+    watchA10(data.job_id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
+    loadMemberCenter().catch(() => {});
+  } finally {
+    a10Submitting = false;
+    if (button) button.disabled = false;
+  }
+}
+
+async function watchA10(jobId) {
+  const watch = `${jobId}-${crypto.randomUUID()}`;
+  a10Watching = watch;
+  let failures = 0;
+  for (let attempt = 0; attempt < 1440; attempt += 1) {
+    if (a10Watching !== watch || activeId !== "A10") return;
+    let response;
+    try { response = await fetch(`${getApiBase()}/api/jobs/${encodeURIComponent(jobId)}`, { headers: getAuthHeaders() }); }
+    catch {
+      failures += 1;
+      if (failures >= 5) throw new Error("連線中斷；任務可能仍在執行，請至會員任務紀錄查看，勿重複送出。");
+      await wait(5000);
+      continue;
+    }
+    const job = await a10Response(response);
+    failures = 0;
+    if (a10Watching !== watch || activeId !== "A10") return;
+    if (job.status === "completed") { setA10Result(job); loadMemberCenter().catch(() => {}); return; }
+    if (job.status === "failed") throw new Error("建模未完成，系統已保留紀錄，請聯絡管理員。");
+    const labels = { queued: "等待建模主機", analyzing: "分析 DXF 圖面", modeling: "建立 SketchUp 模型",
+      checking: "檢查模型成果", uploading: "回傳模型檔案" };
+    const percent = Math.max(0, Math.min(99, Number(job.progress_percent) || 0));
+    mainPreview.innerHTML = `<div class="a10-model-card" role="status"><strong>${labels[job.stage] || "處理任務中"}</strong>
+      <p>階段進度約 ${percent}%</p><progress max="100" value="${percent}" aria-label="建模階段進度"></progress>
+      <p>排隊及複雜圖面可能需要較長時間。可離開頁面，稍後從會員任務紀錄取得成果。</p></div>`;
+    await wait(5000);
+  }
+  throw new Error("任務仍在處理，請稍後從會員任務紀錄查看。");
+}
+
+function setA10Result(job) {
+  activeResultJobId = job.job_id;
+  activeResultType = "model";
+  const summary = job.model_summary || {};
+  mainPreview.innerHTML = `<div class="a10-model-card"><strong>SketchUp 模型已完成</strong>
+    <p>${Number(summary.level_count || 0)} 層・${Number(summary.wall_count || 0)} 牆・${Number(summary.slab_count || 0)} 樓板・${Number(summary.column_count || 0)} 柱</p>
+    <p>請下載 SKP，在 SketchUp 中開啟、檢查與編輯。缺標註處可能採預設值，成果不代表全部圖面均已辨識。</p>
+    <button type="button" class="text-button" data-a10-report>下載建模摘要</button><p role="status"></p></div>`;
+  thumbGrid.innerHTML = "";
+  mainPreview.querySelector("[data-a10-report]").addEventListener("click", async (event) => {
+    event.target.disabled = true;
+    try { await downloadA10(job.job_id, "report"); }
+    catch (error) {
+      if (error.name !== "AbortError") mainPreview.querySelector('[role="status"]').textContent = "摘要未能下載，請稍後重試。";
+    }
+    finally { event.target.disabled = false; }
+  });
+}
+
+async function downloadA10(jobId, kind) {
+  const filename = kind === "skp" ? "A10-project.skp" : "A10-summary.json";
+  // Ask while user activation is still available, then stream large models to disk.
+  let handle = null;
+  if (window.isSecureContext && window.showSaveFilePicker) {
+    try {
+      handle = await chooseSaveHandle(filename, kind === "skp" ? "model" : "text", kind === "skp" ? "skp" : "json",
+        kind === "skp" ? "application/octet-stream" : "application/json");
+    } catch (error) {
+      if (!["SecurityError", "NotSupportedError"].includes(error.name)) throw error;
+      // Embedded browsers may expose the picker without allowing its use.
+    }
+  }
+  const response = await fetch(`${getApiBase()}/api/a10/jobs/${encodeURIComponent(jobId)}/files/${kind}`, {
+    headers: getAuthHeaders(), cache: "no-store",
+  });
+  if (!response.ok) { await a10Response(response); return; }
+  if (handle && response.body) {
+    const writable = await handle.createWritable();
+    await response.body.pipeTo(writable);
+    const saved = await handle.getFile();
+    const expectedSize = Number(response.headers.get("content-length") || 0);
+    if (!saved.size || (expectedSize && saved.size !== expectedSize)) throw new Error("檔案未完整存入，請重新下載。");
+    return;
+  }
+  const blob = await response.blob();
+  if (!blob.size) throw new Error("下載檔案內容是空的，請稍後再試。");
+  if (handle) { await saveBlob(blob, handle); return; }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function uploadField(input) {
+  if (activeId === "A10") return a10UploadField();
   const wrapper = document.createElement("div");
   wrapper.className = "upload-box";
   const key = `${activeId}-${input.key}`;
@@ -1624,8 +1803,10 @@ function renderHowToUse(system) {
   if (!howToUseButton || !howToUsePopover || !howToUseImage || !howToUseTitle) return;
 
   const guideSrc = OPERATION_GUIDES[system.id];
-  const isVisible = Boolean(guideSrc && isHowToUseOpen);
-  howToUseButton.hidden = !guideSrc;
+  const isA10 = system.id === "A10";
+  const hasGuide = Boolean(guideSrc || isA10);
+  const isVisible = Boolean(hasGuide && isHowToUseOpen);
+  howToUseButton.hidden = !hasGuide;
   howToUseButton.setAttribute("aria-expanded", String(isVisible));
   howToUseButton.setAttribute("aria-pressed", String(isVisible));
   howToUsePopover.hidden = !isVisible;
@@ -1634,11 +1815,30 @@ function renderHowToUse(system) {
     howToUsePopover.style.setProperty("--how-to-popover-top", `${toolHeader.offsetTop + toolHeader.offsetHeight + 8}px`);
   }
 
-  if (!guideSrc) return;
+  let textGuide = document.getElementById("a10HowToUse");
+  if (!textGuide) {
+    textGuide = document.createElement("div");
+    textGuide.id = "a10HowToUse";
+    textGuide.className = "a10-how-to-use";
+    textGuide.innerHTML = `<p><strong>2D to 3D｜DXF to Skp · 整合測試版</strong></p>
+      <ol>
+        <li>登入會員，確認 A10 獨立額度。A10 不包含於 A1–A9 的既有額度。</li>
+        <li>上傳建築 DXF（上限 50 MB）。建議包含平面、立面與剖面；目前不接受 DWG、PDF 或圖片作為輸入。</li>
+        <li>按「開始建立 3D 模型」，查看排隊與處理狀態。時間依圖面複雜度及排隊情況而定，無須重複送件。</li>
+        <li>完成後下載 SKP 與建模摘要；離開頁面後，可登入會員任務紀錄取件。</li>
+        <li>用 SketchUp 開啟模型，核對牆、柱、樓板及尺寸後再編輯使用。</li>
+      </ol>
+      <p>缺少部分圖面時，依可辨識內容建立模型；缺標註時暫用樓高 320 cm、樓板 15 cm、屋突 300 cm、女兒牆 110 cm。無屋突圖則略過屋突。預設值不是圖面實測值。</p>
+      <p>成果供提案與設計調整，不代表完整施工模型。第一版網頁提供 SKP 與摘要下載，尚不提供 RB 下載。正式啟用前須完成全流程驗收；每位會員一次性初始 3 次，不按月重置；用完由管理員加額。</p>`;
+    howToUsePopover.append(textGuide);
+  }
+  textGuide.hidden = !isA10;
+  howToUseImage.hidden = isA10 || !guideSrc;
+  if (!hasGuide) return;
 
   const guideTitle = `${system.id} How To Use / 如何使用`;
   howToUseTitle.textContent = guideTitle;
-  howToUseImage.src = guideSrc;
+  if (guideSrc) howToUseImage.src = guideSrc;
   howToUseImage.alt = guideTitle;
 }
 
@@ -1659,7 +1859,7 @@ function renderInputs(system) {
   generateButton.className = "generate-button";
   generateButton.type = "button";
   generateButton.textContent =
-    system.result === "prompt"
+    system.id === "A10" ? "開始建立 3D 模型" : system.result === "prompt"
       ? "產生提示詞"
       : system.result === "video"
         ? "AI製作影片"
@@ -1667,6 +1867,7 @@ function renderInputs(system) {
           ? "生成 8 個建築視角"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
+  if (system.id === "A10") generateButton.disabled = a10Submitting;
   inputStack.append(generateButton);
 
   const usageNotice = document.createElement("p");
@@ -1674,6 +1875,12 @@ function renderInputs(system) {
   usageNotice.innerHTML =
     'AI 成果僅供提案、設計討論與概念視覺化，可能有錯誤或變形，送出前請確認素材權利，使用與公開發布前請自行檢查。<a href="#usage-notice">查看完整使用須知</a>';
   inputStack.append(usageNotice);
+  if (system.id === "A10") {
+    const policy = document.createElement("p");
+    policy.className = "generation-notice";
+    policy.textContent = "A10 使用獨立額度，不扣 A1–A8／A9 次數。缺高度時依建模規則暫用樓高 320 cm、樓板 15 cm、屋突 300 cm、女兒牆 110 cm；無屋突圖則略過。圖面大小、複雜度與排隊情況會影響時間。";
+    inputStack.append(policy);
+  }
 }
 
 function renderResult(system) {
@@ -1700,6 +1907,14 @@ function renderResult(system) {
       : "建築圖結果";
   promptOutput.classList.toggle("hidden", !isPrompt);
   renderOutput.classList.toggle("hidden", isPrompt);
+  $("#copyResult").hidden = system.id === "A10";
+
+  if (system.id === "A10") {
+    resultTitle.textContent = "SketchUp 模型";
+    mainPreview.innerHTML = '<div class="a10-model-card"><strong>DXF → SketchUp</strong><p>上傳圖面 → 排隊分析 → 建立模型 → 下載 SKP</p><small>成果為可編輯模型，不是渲染圖片。模型完成後會出現在會員任務紀錄。</small></div>';
+    thumbGrid.innerHTML = "";
+    return;
+  }
 
   if (isPrompt) return;
 
@@ -1956,6 +2171,7 @@ function setVideoResults(videoUrls, system = getActiveSystem(), jobId = activeRe
 
 function setJobResults(system, job) {
   activeResultJobId = job.job_id || "";
+  if (system.id === "A10") return setA10Result(job);
   if (system.result === "video") {
     setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []), system, activeResultJobId);
     return;
@@ -1977,7 +2193,9 @@ function openJobResult(index) {
   activeId = system.id;
   renderApp();
 
-  if (system.result === "prompt") {
+  if (system.id === "A10" && job.status !== "completed") {
+    watchA10(job.job_id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
+  } else if (system.result === "prompt") {
     promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
   } else {
     setJobResults(system, job);
@@ -2093,6 +2311,7 @@ function validateInputs(system) {
 }
 
 async function submitRealJob(system) {
+  if (system.id === "A10") return submitA10();
   if (requiresMember(system) && !getAuthToken()) {
     authMessage.textContent = "請先登入會員後再使用 A2-1～A9。A1-1／A1-2 可免登入試用。";
     authDialog.showModal();
@@ -2157,6 +2376,10 @@ async function submitOrSimulateGenerate() {
   }
 
   if (!getApiBase()) {
+    if (system.id === "A10") {
+      showResultMessage(system, "A10 建模服務尚未連線，無法送出任務。");
+      return;
+    }
     simulateGenerate();
     return;
   }
@@ -2196,7 +2419,7 @@ function renderApp() {
   activeTitle.textContent =
     system.activeTitle || `${system.displayId || system.id} ${system.title}`;
   activeDesc.textContent = system.desc;
-  activeStatus.textContent = system.status;
+  activeStatus.textContent = system.id === "A10" ? "整合測試版" : system.status;
   activeStatus.classList.toggle("pending", system.status !== "Live System");
 
   renderInputs(system);
@@ -2300,7 +2523,7 @@ function prepareResultBlob(url, index = activeResultIndex) {
 
 function getSavePickerTypes(type, extension, mimeType) {
   const description =
-    type === "video"
+    type === "model" ? "SketchUp 模型" : type === "video"
       ? "影片檔案"
       : type === "image"
         ? "圖片檔案"
@@ -2345,6 +2568,7 @@ async function saveBlob(blob, handle) {
 }
 
 function getDownloadButtonLabel(system = getActiveSystem()) {
+  if (system.id === "A10") return "下載 SKP";
   return isZipDownloadMode(system) ? "Save ZIP" : "Save";
 }
 
@@ -2527,6 +2751,15 @@ $("#downloadResult").addEventListener("click", async () => {
   const button = $("#downloadResult");
   const defaultLabel = getDownloadButtonLabel(system);
   const filenameBase = `${activeId.toLowerCase()}-architect-ai-result`;
+  if (system.id === "A10") {
+    if (!activeResultJobId || activeResultType !== "model") return;
+    button.disabled = true;
+    button.textContent = "下載中…";
+    try { await downloadA10(activeResultJobId, "skp"); button.textContent = "已送出下載"; }
+    catch (error) { if (error?.name !== "AbortError") showResultMessage(system, "模型下載未完成，請重新嘗試或使用 Edge／Chrome。"); }
+    finally { button.disabled = false; window.setTimeout(() => { button.textContent = getDownloadButtonLabel(); }, 2500); }
+    return;
+  }
 
   if (system.result === "prompt") {
     const blob = new Blob([promptOutput.textContent.trim()], { type: "text/plain;charset=utf-8" });
@@ -2625,7 +2858,10 @@ $("#downloadResult").addEventListener("click", async () => {
 
 const authDialog = $("#authDialog");
 document.querySelectorAll("[data-open-auth]").forEach((button) => {
-  button.addEventListener("click", () => authDialog.showModal());
+  button.addEventListener("click", () => {
+    authDialog.showModal();
+    if (getAuthToken()) loadMemberCenter().catch(() => {});
+  });
 });
 
 const contactDialog = $("#contactDialog");

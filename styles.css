@@ -2662,3 +2662,17 @@ body[data-theme="white"] .badge::before {
   }
 }
 
+/* A10 keeps CAD files out of the image-preview workflow. */
+.a10-drop-zone { min-height: 180px; display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
+.a10-model-card { width: 100%; padding: 28px; text-align: left; line-height: 1.7; overflow-wrap: anywhere; }
+.a10-model-card strong { font-size: 1.35rem; }
+.a10-model-card progress { width: 100%; accent-color: #4b7770; }
+.a10-model-card small { opacity: .75; }
+.a10-drop-zone + [role="status"]:empty { display: none; }
+.a10-how-to-use {
+  padding: 16px 20px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.a10-how-to-use li + li { margin-top: 10px; }
+.a10-how-to-use p + p { margin-top: 14px; }
