@@ -1809,6 +1809,26 @@ async function loadTransitionPresetFiles(system, imageSources) {
   );
 }
 
+function videoOutputFields() {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field-box";
+  wrapper.innerHTML = `
+    <label for="videoAspectRatio">影片尺寸</label>
+    <select id="videoAspectRatio">
+      <option value="1:1">1:1</option>
+      <option value="4:3">4:3</option>
+      <option value="16:9">16:9</option>
+    </select>
+    <label for="videoMegapixels">影片品質</label>
+    <select id="videoMegapixels">
+      <option value="0.3">低品質</option>
+      <option value="0.7">中品質</option>
+    </select>
+    <small>預設為 1:1／低品質。中品質需要較多運算時間。</small>
+  `;
+  return wrapper;
+}
+
 function countField() {
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
@@ -1874,6 +1894,7 @@ function renderInputs(system) {
   inputStack.innerHTML = "";
   inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
+  if (["A9-1", "A9-2"].includes(system.id)) inputStack.append(videoOutputFields());
   if (system.prompt) inputStack.append(textPromptField(system));
   if (system.transitionPrompts) inputStack.append(transitionPromptFields(system));
   if (system.count) inputStack.append(countField());
@@ -2349,6 +2370,10 @@ async function submitRealJob(system) {
   formData.append("prompt", $("#customPrompt")?.value || "");
   formData.append("count", ($("#outputCount")?.value || "1").trim().startsWith("6") ? "6" : "1");
   formData.append("client_id", getClientId());
+  if (["A9-1", "A9-2"].includes(system.id)) {
+    formData.append("video_aspect_ratio", $("#videoAspectRatio")?.value || "1:1");
+    formData.append("video_megapixels", $("#videoMegapixels")?.value || "0.3");
+  }
   if (system.transitionPrompts) {
     document.querySelectorAll("[data-transition-prompt]").forEach((textarea) => {
       formData.append(textarea.dataset.transitionPrompt, textarea.value || "");
