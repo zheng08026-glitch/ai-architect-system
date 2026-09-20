@@ -1809,7 +1809,8 @@ async function loadTransitionPresetFiles(system, imageSources) {
   );
 }
 
-function videoOutputFields() {
+function videoOutputFields(system) {
+  const isA91 = system.id === "A9-1";
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
   wrapper.innerHTML = `
@@ -1821,10 +1822,16 @@ function videoOutputFields() {
     </select>
     <label for="videoMegapixels">影片品質</label>
     <select id="videoMegapixels">
+      ${isA91 ? `
+      <option value="0.5">低品質</option>
+      <option value="0.8">中品質</option>
+      <option value="1.0">高品質</option>
+      ` : `
       <option value="0.3">低品質</option>
       <option value="0.7">中品質</option>
+      `}
     </select>
-    <small>預設為 1:1／低品質。中品質需要較多運算時間。</small>
+    <small>預設為 1:1／低品質。${isA91 ? "中、高品質" : "中品質"}需要較多運算時間。</small>
   `;
   return wrapper;
 }
@@ -1894,7 +1901,7 @@ function renderInputs(system) {
   inputStack.innerHTML = "";
   inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
-  if (["A9-1", "A9-2"].includes(system.id)) inputStack.append(videoOutputFields());
+  if (["A9-1", "A9-2", "A9-3"].includes(system.id)) inputStack.append(videoOutputFields(system));
   if (system.prompt) inputStack.append(textPromptField(system));
   if (system.transitionPrompts) inputStack.append(transitionPromptFields(system));
   if (system.count) inputStack.append(countField());
@@ -2370,9 +2377,9 @@ async function submitRealJob(system) {
   formData.append("prompt", $("#customPrompt")?.value || "");
   formData.append("count", ($("#outputCount")?.value || "1").trim().startsWith("6") ? "6" : "1");
   formData.append("client_id", getClientId());
-  if (["A9-1", "A9-2"].includes(system.id)) {
+  if (["A9-1", "A9-2", "A9-3"].includes(system.id)) {
     formData.append("video_aspect_ratio", $("#videoAspectRatio")?.value || "1:1");
-    formData.append("video_megapixels", $("#videoMegapixels")?.value || "0.3");
+    formData.append("video_megapixels", $("#videoMegapixels")?.value || (system.id === "A9-1" ? "0.5" : "0.3"));
   }
   if (system.transitionPrompts) {
     document.querySelectorAll("[data-transition-prompt]").forEach((textarea) => {
