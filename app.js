@@ -1300,8 +1300,21 @@ function uploadField(input) {
   return wrapper;
 }
 
-const A9_HORIZONTAL_PROMPT =
-  "(Camera moving from left to right:1.5), shooting clockwise around a horizontal plane. A cinematic aerial drone captures a sunset over a  building. The view sweeps steadily to the right, revealing the right side of the building structure. The background blurs as the camera circles in a clockwise arc. Golden hour lighting, high-speed motion blur on surroundings, building remains sharp and centered. Architectural consistency, stable geometry, 4k, professional advertising style.";
+const A9_HORIZONTAL_PROMPT = `对于目标视频，在目标视频的第 0.00 秒，完全参考 <Picture 1>（来自 [Shot 1]）。
+
+integrated_multimodal_description: [Shot 1] 电影级建筑可视化，现代建筑，晴朗蓝天与金色黄昏光线。严格保持起始图像中建筑物的精确几何结构、立面材质、木质垂直百叶、窗户灯光、广场铺装、人车树以及整体光影不变。仅摄像机运动。摄像机以平滑、缓慢、连续的方式围绕建筑物进行水平顺时针 90 度轨道运镜，从当前正面三分之三视角开始，结束于侧面立面视角，全程保持建筑物居中、比例稳定。背景建筑与运河产生自然轻微视差。不新增任何物体，不变形，不扭曲建筑结构。高端房地产电影质感，细节锐利，光影一致。
+
+overall_soundscape: 轻柔的城市环境音，远处轻微车流与运河水声，广场上细微脚步声，安静而精致。
+
+non_diegetic_music: 优雅纯器乐，无任何人声，高雅当代古典或氛围钢琴配合柔和弦乐，高端精致奢华氛围，音量适中，全程持续。`;
+const A9_HORIZONTAL_LEFT_PROMPT = A9_HORIZONTAL_PROMPT.replace("水平顺时针", "水平逆时针");
+const A9_ASCEND_PROMPT = `对于目标视频，在目标视频的第 0.00 秒，完全参考 <Picture 1>（来自 [Shot 1]）。
+
+integrated_multimodal_description: [Shot 1] 电影级建筑可视化，现代建筑，晴朗蓝天与金色黄昏光线。严格保持起始图像中建筑物的精确几何结构、立面材质、木质垂直百叶、窗户灯光、广场铺装、人车树以及整体光影不变。仅摄像机运动。仅摄像机运动。摄像机从当前人行高度视角开始，以平滑、缓慢、连续的方式向上升起并向前推进，最终移动至建筑物正上方，以稳定的俯视角度完整展示建筑物顶部与周边环境。全程保持建筑物居中、比例稳定。背景建筑与运河产生自然轻微视差。不新增任何物体，不变形，不扭曲建筑结构。高端房地产电影质感，细节锐利，光影一致。
+
+overall_soundscape: 轻柔的城市环境音，远处轻微车流与运河水声，广场上细微脚步声，安静而精致。
+
+non_diegetic_music: 优雅纯器乐，无任何人声，高雅当代古典或氛围钢琴配合柔和弦乐，高端精致奢华氛围，音量适中，全程持续。`;
 const A9_FLY_AROUND_PROMPT =
   "Stable drone shot, flying around the skyscraper complex, smooth sweeping cinematic arc movement, breathtaking architectural perspective.";
 const A9_ORBIT_PROMPT =
@@ -1309,6 +1322,8 @@ const A9_ORBIT_PROMPT =
 
 const A9_PROMPT_PRESETS = {
   horizontal: A9_HORIZONTAL_PROMPT,
+  "horizontal-left": A9_HORIZONTAL_LEFT_PROMPT,
+  ascend: A9_ASCEND_PROMPT,
   "fly-around": A9_FLY_AROUND_PROMPT,
   orbit: A9_ORBIT_PROMPT,
 };
@@ -1616,11 +1631,11 @@ function textPromptField(system) {
         ? `
           <div class="prompt-presets" aria-label="推薦提示詞">
             <span>推薦提示詞</span>
-            <button type="button" data-prompt-preset="horizontal">1. 水平移動</button>
-            <button type="button" data-prompt-preset="fly-around">2. Fly Around（航拍大範圍透視）</button>
-            <button type="button" data-prompt-preset="orbit">3. Orbit（建築環繞／3D 透視）</button>
-            <button type="button" disabled>4. 待更新</button>
-            <button type="button" disabled>5. 待更新</button>
+            <button type="button" data-prompt-preset="horizontal">1. 水平移動-向右</button>
+            <button type="button" data-prompt-preset="horizontal-left">2. 水平移動-向左</button>
+            <button type="button" data-prompt-preset="ascend">3. 往建築物上方移動</button>
+            <button type="button" data-prompt-preset="fly-around">4. Fly Around (航拍大範圍透視)</button>
+            <button type="button" data-prompt-preset="orbit">5. Orbit (建築環繞)</button>
           </div>
         `
         : isA7Biomimetic
@@ -1823,15 +1838,22 @@ function videoOutputFields(system) {
     <label for="videoMegapixels">影片品質</label>
     <select id="videoMegapixels">
       ${isA91 ? `
-      <option value="0.5">低品質</option>
-      <option value="0.8">中品質</option>
-      <option value="1.0">高品質</option>
+      <option value="0.3">低品質</option>
+      <option value="0.5">中品質</option>
+      <option value="unavailable" disabled>高品質（暫不開放）</option>
       ` : `
       <option value="0.3">低品質</option>
       <option value="0.7">中品質</option>
       `}
     </select>
-    <small>預設為 1:1／低品質。${isA91 ? "中、高品質" : "中品質"}需要較多運算時間。</small>
+    ${isA91 ? `
+    <label for="videoDuration">影片時間</label>
+    <select id="videoDuration">
+      <option value="10">10秒</option>
+      <option value="15" disabled>15秒（暫不開放）</option>
+    </select>
+    ` : ""}
+    <small>預設為 1:1／低品質。中品質需要較多運算時間。</small>
   `;
   return wrapper;
 }
@@ -2379,7 +2401,8 @@ async function submitRealJob(system) {
   formData.append("client_id", getClientId());
   if (["A9-1", "A9-2", "A9-3"].includes(system.id)) {
     formData.append("video_aspect_ratio", $("#videoAspectRatio")?.value || "1:1");
-    formData.append("video_megapixels", $("#videoMegapixels")?.value || (system.id === "A9-1" ? "0.5" : "0.3"));
+    formData.append("video_megapixels", $("#videoMegapixels")?.value || "0.3");
+    if (system.id === "A9-1") formData.append("video_duration", $("#videoDuration")?.value || "10");
   }
   if (system.transitionPrompts) {
     document.querySelectorAll("[data-transition-prompt]").forEach((textarea) => {
