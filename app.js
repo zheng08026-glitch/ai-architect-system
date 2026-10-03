@@ -242,6 +242,9 @@ systems.push({
   inputs: [{ key: "dxf", label: "建築圖面 DXF" }], count: false, prompt: false,
 });
 
+const legacyA10 = systems.find(s => s.id === "A10");
+Object.assign(legacyA10, {title:"A10-Bata", displayId:"A10-Bata", activeTitle:"A10-Bata｜2D 轉 3D"});
+systems.push({...legacyA10,id:"A10_V1",displayId:"A10-v1",title:"A10-v1",activeTitle:"A10-v1｜2D 轉 3D",desc:"上傳 DXF，選擇樓板、建築量體、外牆或外牆含室內隔間。"});
 const gridSystems = [
   {
     ...systems.find((system) => system.id === "A1-1"),
@@ -300,12 +303,69 @@ const sidebarGroups = [
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
 gridSystems.push(systems.find((system) => system.id === "A10"));
-sidebarGroups.push({ id: "A10", systemId: "A10" });
+sidebarGroups.push({id:"A10",title:"2D 轉 3D",summary:"DXF → SketchUp",childIds:["A10","A10_V1"]});
 
 let activeId = "A1-1";
 let expandedSidebarGroup = null;
 const previews = new Map();
 const uploadedFiles = new Map();
+// A10-v1 candidate: independent file, mode and idempotency state.
+let a10V1File = null;
+let a10V1Exterior = "";
+let a10V1Submitting = false;
+const a10V1Keys = new Map();
+const a10JobVersions = new Map();
+
+function a10V1Inputs() {
+  inputStack.innerHTML = `<div class="upload-box">
+    <span class="upload-label">上傳 DXF 圖面（最大 50 MB）</span>
+    <label class="drop-zone"><span>${a10V1File ? escapeHtml(a10V1File.name) : "選擇 DXF 檔案"}</span>
+      <input type="file" accept=".dxf" aria-label="上傳新版 DXF" ${a10V1Submitting ? "disabled" : ""}></label>
+    <label>外牆類型 <select data-v1-exterior aria-label="外牆類型" ${a10V1Submitting ? "disabled" : ""}>
+      <option value="">請選擇</option><option value="solid">實體牆面</option><option value="curtain">玻璃帷幕</option>
+    </select></label><p class="generation-notice">項目 3、4 必須選擇外牆類型；項目 1、2 不需要。</p>
+    <section class="a10-v1-generation"><h3>開始生成3D模型</h3><div class="a10-v1-buttons">
+      ${["僅生成樓板", "僅生成建築量體", "生成建築外牆", "生成建築外牆＋室內隔間"].map((label,i)=>
+        `<button type="button" class="generate-button" data-v1-mode="${i+1}" ${!a10V1File || a10V1Submitting || (i>1&&!a10V1Exterior) ? "disabled" : ""}>${i+1}．${label}</button>`).join("")}
+    </div></section><p role="status" data-v1-error></p></div>`;
+  const input = inputStack.querySelector("input");
+  input.addEventListener("change", () => {
+    const f = input.files[0];
+    if (!f) return;
+    if (!/\.dxf$/i.test(f.name) || !f.size || f.size>50*1024*1024) {
+      inputStack.querySelector("[data-v1-error]").textContent="請選擇非空白、50 MB 以下的 DXF。";return;
+    }
+    a10V1File=f;a10V1Keys.clear();a10V1Inputs();
+  });
+  const exterior=inputStack.querySelector("select");exterior.value=a10V1Exterior;
+  exterior.addEventListener("change",()=>{a10V1Exterior=exterior.value;a10V1Inputs();});
+  inputStack.querySelectorAll("[data-v1-mode]").forEach(button=>button.addEventListener("click",()=>
+    submitA10V1(Number(button.dataset.v1Mode)).catch(error=>{
+      if(activeId==="A10_V1")showResultMessage(getActiveSystem(),error.message);
+    })));
+}
+
+async function submitA10V1(mode) {
+  if(a10V1Submitting)return;
+  if(!getAuthToken()){authMessage.textContent="請先登入會員。";authDialog.showModal();return;}
+  if(!a10V1File || (mode>2&&!a10V1Exterior))throw new Error("請完成檔案與外牆類型選擇。");
+  const file=a10V1File, exterior=mode>2?a10V1Exterior:"", key=`${mode}:${exterior}`;
+  if(!a10V1Keys.has(key))a10V1Keys.set(key,crypto.randomUUID());
+  const requestKey=a10V1Keys.get(key);
+  a10V1Submitting=true;a10V1Inputs();
+  try {
+    const config=await a10Response(await fetch(`${getApiBase()}/api/a10-v1/config`));
+    if(!config.enabled)throw new Error("A10-v1 尚未啟用，請稍後再試。");
+    const form=new FormData();form.append("dxf",file);form.append("mode",String(mode));
+    form.append("exterior_type",exterior);form.append("request_key",requestKey);
+    const data=await a10Response(await fetch(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form}));
+    a10JobVersions.set(data.job_id,"A10_V1");
+    if(activeId==="A10_V1")showResultMessage(getActiveSystem(),"任務已送出，正在等待建模主機。");
+    watchA10(data.job_id,"A10_V1").catch(error=>{if(activeId==="A10_V1")showResultMessage(getActiveSystem(),error.message);});
+    loadMemberCenter().catch(()=>{});
+  } finally {a10V1Submitting=false;if(activeId==="A10_V1")a10V1Inputs();}
+}
+
 const a10RequestKeys = new WeakMap();
 let a10Submitting = false;
 let a10DrawingUnit = "cm";
@@ -570,7 +630,7 @@ function renderJobList(records = []) {
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
             ${
-              hasResult || (job.system_id === "A10" && ["pending", "processing", "finalizing"].includes(job.status))
+              hasResult || (["A10","A10_V1"].includes(job.system_id) && ["pending", "processing", "finalizing"].includes(job.status))
                 ? `<button type="button" class="text-button" data-open-job="${index}">${hasResult ? "查看成果" : "查看進度"}</button>`
                 : ""
             }
@@ -1174,12 +1234,12 @@ async function submitA10() {
   }
 }
 
-async function watchA10(jobId) {
+async function watchA10(jobId, systemId="A10") {
   const watch = `${jobId}-${crypto.randomUUID()}`;
   a10Watching = watch;
   let failures = 0;
   for (let attempt = 0; attempt < 1440; attempt += 1) {
-    if (a10Watching !== watch || activeId !== "A10") return;
+    if (a10Watching !== watch || activeId !== systemId) return;
     let response;
     try { response = await fetch(`${getApiBase()}/api/jobs/${encodeURIComponent(jobId)}`, { headers: getAuthHeaders() }); }
     catch {
@@ -1190,7 +1250,7 @@ async function watchA10(jobId) {
     }
     const job = await a10Response(response);
     failures = 0;
-    if (a10Watching !== watch || activeId !== "A10") return;
+    if (a10Watching !== watch || activeId !== systemId) return;
     if (job.status === "completed") { setA10Result(job); loadMemberCenter().catch(() => {}); return; }
     if (job.status === "failed") {
       if (["A10_UNIT_CONFLICT", "A10_UNIT_UNRESOLVED"].includes(job.error_code)) throw new Error("圖面單位需要確認，請聯絡管理員檢查此任務；不要重複送件。");
@@ -1208,6 +1268,7 @@ async function watchA10(jobId) {
 }
 
 function setA10Result(job) {
+  a10JobVersions.set(job.job_id,job.system_id || activeId);
   activeResultJobId = job.job_id;
   activeResultType = "model";
   const summary = job.model_summary || {};
@@ -1239,7 +1300,7 @@ async function downloadA10(jobId, kind) {
       // Embedded browsers may expose the picker without allowing its use.
     }
   }
-  const response = await fetch(`${getApiBase()}/api/a10/jobs/${encodeURIComponent(jobId)}/files/${kind}`, {
+  const response = await fetch(`${getApiBase()}/api/${a10JobVersions.get(jobId)==="A10_V1"?"a10-v1":"a10"}/jobs/${encodeURIComponent(jobId)}/files/${kind}`, {
     headers: getAuthHeaders(), cache: "no-store",
   });
   if (!response.ok) { await a10Response(response); return; }
@@ -1920,6 +1981,7 @@ function toggleHowToUse() {
 }
 
 function renderInputs(system) {
+  if(system.id === "A10_V1") {a10V1Inputs();return;}
   inputStack.innerHTML = "";
   inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
   system.inputs.forEach((input) => inputStack.append(uploadField(input)));
@@ -1980,9 +2042,9 @@ function renderResult(system) {
       : "建築圖結果";
   promptOutput.classList.toggle("hidden", !isPrompt);
   renderOutput.classList.toggle("hidden", isPrompt);
-  $("#copyResult").hidden = system.id === "A10";
+  $("#copyResult").hidden = ["A10","A10_V1"].includes(system.id);
 
-  if (system.id === "A10") {
+  if (["A10","A10_V1"].includes(system.id)) {
     resultTitle.textContent = "SketchUp 模型";
     mainPreview.innerHTML = '<div class="a10-model-card"><strong>DXF → SketchUp</strong><p>上傳圖面 → 排隊分析 → 建立模型 → 下載 SKP</p><small>成果為可編輯模型，不是渲染圖片。模型完成後會出現在會員任務紀錄。</small></div>';
     thumbGrid.innerHTML = "";
@@ -2244,7 +2306,7 @@ function setVideoResults(videoUrls, system = getActiveSystem(), jobId = activeRe
 
 function setJobResults(system, job) {
   activeResultJobId = job.job_id || "";
-  if (system.id === "A10") return setA10Result(job);
+  if (["A10","A10_V1"].includes(system.id)) return setA10Result(job);
   if (system.result === "video") {
     setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []), system, activeResultJobId);
     return;
@@ -2266,8 +2328,8 @@ function openJobResult(index) {
   activeId = system.id;
   renderApp();
 
-  if (system.id === "A10" && job.status !== "completed") {
-    watchA10(job.job_id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
+  if (["A10","A10_V1"].includes(system.id) && job.status !== "completed") {
+    watchA10(job.job_id,system.id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
   } else if (system.result === "prompt") {
     promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
   } else {
@@ -2646,7 +2708,7 @@ async function saveBlob(blob, handle) {
 }
 
 function getDownloadButtonLabel(system = getActiveSystem()) {
-  if (system.id === "A10") return "下載 SKP";
+  if (["A10","A10_V1"].includes(system.id)) return "下載 SKP";
   return isZipDownloadMode(system) ? "Save ZIP" : "Save";
 }
 
@@ -2829,7 +2891,7 @@ $("#downloadResult").addEventListener("click", async () => {
   const button = $("#downloadResult");
   const defaultLabel = getDownloadButtonLabel(system);
   const filenameBase = `${activeId.toLowerCase()}-architect-ai-result`;
-  if (system.id === "A10") {
+  if (["A10","A10_V1"].includes(system.id)) {
     if (!activeResultJobId || activeResultType !== "model") return;
     button.disabled = true;
     button.textContent = "下載中…";

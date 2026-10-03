@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: dark;
   --bg: #050711;
   --page-bg: linear-gradient(135deg, #04050e 0%, #080b20 44%, #110b2e 100%);
@@ -2676,3 +2676,7 @@ body[data-theme="white"] .badge::before {
 }
 .a10-how-to-use li + li { margin-top: 10px; }
 .a10-how-to-use p + p { margin-top: 14px; }
+
+.a10-v1-buttons{display:grid;grid-template-columns:1fr;gap:12px}.a10-v1-generation{margin-top:24px}.a10-v1-generation h3{font-size:22px}.a10-v1-buttons .generate-button{margin:0;white-space:normal;min-height:64px}.a10-v1-buttons button:disabled{opacity:.45;cursor:not-allowed}
+
+.a10-v1-generation{padding:0!important;min-height:0!important;border:0;background:none}.a10-v1-generation h3{margin:0 0 14px}.a10-v1-generation .a10-v1-buttons{padding:0}.a10-v1-generation .generate-button{width:100%}
