@@ -243,8 +243,8 @@ systems.push({
 });
 
 const legacyA10 = systems.find(s => s.id === "A10");
-Object.assign(legacyA10, {title:"A10-Bata", displayId:"A10-Bata", activeTitle:"A10-Bata｜2D 轉 3D"});
-systems.push({...legacyA10,id:"A10_V1",displayId:"A10-v1",title:"A10-v1",activeTitle:"A10-v1｜2D 轉 3D",desc:"上傳 DXF，選擇樓板、建築量體、外牆或外牆含室內隔間。"});
+Object.assign(legacyA10, {title:"A10-Bata", displayId:"A10-Bata", activeTitle:"A10-Bata｜2D TO 3D"});
+systems.push({...legacyA10,id:"A10_V1",displayId:"A10-v1",title:"A10-v1",activeTitle:"A10-v1｜2D TO 3D",desc:"上傳 DXF，選擇樓板、建築量體、外牆或外牆含室內隔間。"});
 const gridSystems = [
   {
     ...systems.find((system) => system.id === "A1-1"),
@@ -303,7 +303,7 @@ const sidebarGroups = [
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
 gridSystems.push({...systems.find((system) => system.id === "A10"), gridDisplayId: "A10", title: "2D TO 3D"});
-sidebarGroups.push({id:"A10",title:"2D 轉 3D",summary:"DXF → SketchUp",childIds:["A10","A10_V1"]});
+sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF → SketchUp",childIds:["A10","A10_V1"]});
 
 let activeId = "A1-1";
 let expandedSidebarGroup = null;
