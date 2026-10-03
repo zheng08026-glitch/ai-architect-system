@@ -302,7 +302,7 @@ const sidebarGroups = [
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
-gridSystems.push(systems.find((system) => system.id === "A10"));
+gridSystems.push({...systems.find((system) => system.id === "A10"), gridDisplayId: "A10", title: "2D TO 3D"});
 sidebarGroups.push({id:"A10",title:"2D 轉 3D",summary:"DXF → SketchUp",childIds:["A10","A10_V1"]});
 
 let activeId = "A1-1";
