@@ -335,41 +335,50 @@ function a10V1Inputs() {
     if (!/\.dxf$/i.test(f.name) || !f.size || f.size>50*1024*1024) {
       inputStack.querySelector("[data-v1-error]").textContent="請選擇非空白、50 MB 以下的 DXF。";return;
     }
-    a10V1File=f;a10V1Keys.clear();a10V1Inputs();
+    resetA10View();a10V1File=f;a10V1Keys.clear();a10V1Inputs();renderResult(getActiveSystem());
   });
   const exterior=inputStack.querySelector("select");exterior.value=a10V1Exterior;
-  exterior.addEventListener("change",()=>{a10V1Exterior=exterior.value;a10V1Inputs();});
+  exterior.addEventListener("change",()=>{resetA10View();a10V1Exterior=exterior.value;a10V1Inputs();renderResult(getActiveSystem());});
   inputStack.querySelectorAll("[data-v1-mode]").forEach(button=>button.addEventListener("click",()=>
     submitA10V1(Number(button.dataset.v1Mode)).catch(error=>{
-      if(activeId==="A10_V1")showResultMessage(getActiveSystem(),error.message);
+      if(activeId==="A10_V1")showResultMessage(getActiveSystem(),a10ErrorMessage(error));
     })));
 }
 
 async function submitA10V1(mode) {
   if(a10V1Submitting)return;
   if(!getAuthToken()){authMessage.textContent="請先登入會員。";authDialog.showModal();return;}
-  if(!a10V1File || (mode>2&&!a10V1Exterior))throw new Error("請完成檔案與外牆類型選擇。");
+  if(!a10V1File || (mode>2&&!a10V1Exterior))throw a10PublicError("請完成檔案與外牆類型選擇。");
   const file=a10V1File, exterior=mode>2?a10V1Exterior:"", key=`${mode}:${exterior}`;
   if(!a10V1Keys.has(key))a10V1Keys.set(key,crypto.randomUUID());
   const requestKey=a10V1Keys.get(key);
+  const view=resetA10View();
+  renderResult(getActiveSystem());
   a10V1Submitting=true;a10V1Inputs();
   try {
-    const config=await a10Response(await fetch(`${getApiBase()}/api/a10-v1/config`));
-    if(!config.enabled)throw new Error("A10-v1 尚未啟用，請稍後再試。");
+    const config=await a10FetchJson(`${getApiBase()}/api/a10-v1/config`);
+    if(view!==a10ViewVersion || activeId!=="A10_V1")return;
+    if(!config.enabled)throw a10PublicError("A10-v1 尚未啟用，請稍後再試。");
     const form=new FormData();form.append("dxf",file);form.append("mode",String(mode));
     form.append("exterior_type",exterior);form.append("request_key",requestKey);
-    const data=await a10Response(await fetch(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form}));
+    const data=await a10FetchJson(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form},{timeoutMs:120000});
     a10JobVersions.set(data.job_id,"A10_V1");
-    if(activeId==="A10_V1")showResultMessage(getActiveSystem(),"任務已送出，正在等待建模主機。");
-    watchA10(data.job_id,"A10_V1").catch(error=>{if(activeId==="A10_V1")showResultMessage(getActiveSystem(),error.message);});
+    if(view===a10ViewVersion && activeId==="A10_V1")void watchA10(data.job_id,"A10_V1");
     loadMemberCenter().catch(()=>{});
+  } catch(error) {
+    if(view===a10ViewVersion && activeId==="A10_V1")showResultMessage(getActiveSystem(),`${a10ErrorMessage(error)} 若送件狀態不明，請先查看會員任務紀錄；原選項重試會使用同一送件識別，請勿重新上傳。`);
   } finally {a10V1Submitting=false;if(activeId==="A10_V1")a10V1Inputs();}
 }
 
 const a10RequestKeys = new WeakMap();
 let a10Submitting = false;
 let a10DrawingUnit = "cm";
-let a10Watching = "";
+let a10Watching = null;
+let a10ViewVersion = 0;
+const A10_STATUS_TIMEOUT_MS = 15000;
+const A10_WATCH_DURATION_MS = 2 * 60 * 60 * 1000;
+const A10_POLL_INTERVAL_MS = 5000;
+const A10_FETCH_FAILURE_LIMIT = 5;
 const transitionPromptValues = new Map();
 let a93PresetLoadVersion = 0;
 let activeResultUrl = "";
@@ -523,6 +532,9 @@ function classifyPublicJobError(job = {}) {
 
 function getPublicJobError(job = {}) {
   if (!job) return "";
+  if (["A10", "A10_V1"].includes(job.system_id) &&
+      ["failed", "timeout", "timed_out", "expired", "unsupported", "needs_review", "cancelled", "canceled"].includes(job.status))
+    return a10JobFailure(job);
   const rawMessage = String(job.public_error || job.error || "");
   const publicMessage = String(job.public_error || "");
   if (!rawMessage && job.status !== "failed") return "";
@@ -1038,6 +1050,7 @@ function sidebarGroupContains(group, systemId) {
 function activateSystem(systemId, groupId = null) {
   const system = getSystem(systemId);
   if (!system || system.status !== "Live System") return;
+  resetA10View();
   if (activeId === "A9-3" && system.id !== activeId) a93PresetLoadVersion += 1;
   activeId = system.id;
   expandedSidebarGroup = groupId;
@@ -1162,6 +1175,8 @@ function a10UploadField() {
   unitSelect.value = a10DrawingUnit;
   unitSelect.disabled = a10Submitting;
   unitSelect.addEventListener("change", () => {
+    resetA10View();
+    renderResult(getActiveSystem());
     a10DrawingUnit = unitSelect.value;
     const current = uploadedFiles.get("A10-dxf");
     if (current) a10RequestKeys.set(current, crypto.randomUUID());
@@ -1173,6 +1188,7 @@ function a10UploadField() {
       message.textContent = "請選擇非空白、50 MB 以下的 DXF 檔案。";
       return;
     }
+    resetA10View();
     uploadedFiles.set("A10-dxf", candidate);
     a10RequestKeys.set(candidate, crypto.randomUUID());
     renderApp();
@@ -1184,17 +1200,77 @@ function a10UploadField() {
   return wrapper;
 }
 
+function a10PublicError(message, code = "A10_PUBLIC_ERROR", retryable = false) {
+  return Object.assign(new Error(message), { name: "A10PublicError", code, retryable });
+}
+
+function a10ErrorMessage(error) {
+  return error?.name === "A10PublicError" ? error.message : "A10 服務暫時無法回應，請至會員任務紀錄查看。";
+}
+
+function stopA10Watch() {
+  a10Watching?.controller.abort();
+  a10Watching = null;
+}
+
+function resetA10View() {
+  stopA10Watch();
+  a10ViewVersion += 1;
+  return a10ViewVersion;
+}
+
+// The deadline includes reading the response body. A stalled fetch/body must not
+// leave the UI waiting forever, even if a transport ignores AbortSignal.
+async function a10FetchJson(url, options = {}, { signal, timeoutMs = A10_STATUS_TIMEOUT_MS } = {}) {
+  const controller = new AbortController();
+  let timer;
+  let onAbort;
+  const stopped = new Promise((_, reject) => {
+    onAbort = () => { controller.abort(); reject(new DOMException("Cancelled", "AbortError")); };
+    if (signal?.aborted) { onAbort(); return; }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(a10PublicError("查詢服務逾時。", "A10_REQUEST_TIMEOUT", true));
+    }, timeoutMs);
+  });
+  try {
+    if (signal?.aborted) return await stopped;
+    return await Promise.race([
+      stopped,
+      fetch(url, { ...options, signal: controller.signal }).then(a10Response),
+    ]);
+  } catch (error) {
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    if (error?.name === "A10PublicError") throw error;
+    throw a10PublicError("無法取得服務回應，請確認網路連線。", "A10_NETWORK", true);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+function a10PollDelay(ms, signal) {
+  return new Promise((resolve) => {
+    const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); resolve(); };
+    const timer = setTimeout(finish, ms);
+    if (signal.aborted) finish();
+    else signal.addEventListener("abort", finish, { once: true });
+  });
+}
+
 async function a10Response(response) {
   if (response.ok) return response.json();
   const detail = await response.json().catch(() => ({}));
-  if (detail.detail === "A10_UNIT_CONFLICT") throw new Error("DXF 宣告單位與所選單位不同，本次未建立任務、未扣額。請確認原圖單位後更正選項；若檔案宣告錯誤，請先由 CAD 修正後匯出。");
-  if (detail.detail === "A10_INVALID_UNIT") throw new Error("請選擇公分、毫米或公尺。");
+  if (detail.detail === "A10_UNIT_CONFLICT") throw a10PublicError("DXF 宣告單位與所選單位不同，本次未建立任務、未扣額。請確認原圖單位後更正選項；若檔案宣告錯誤，請先由 CAD 修正後匯出。", "A10_UNIT_CONFLICT");
+  if (detail.detail === "A10_INVALID_UNIT") throw a10PublicError("請選擇公分、毫米或公尺。", "A10_INVALID_UNIT");
   // Small public categories; never display raw proxy, engine, or filesystem diagnostics.
   const messages = { 400: "請檢查 DXF 格式與檔案內容。", 401: "請先登入會員，或重新登入後再試。",
     403: "此帳號目前無法使用 A10，請聯絡管理員。", 404: "找不到任務或沒有存取權限。",
-    409: "任務狀態已改變，請重新整理會員任務紀錄。", 413: "DXF 超過 50 MB 大小限制。",
+    408: "查詢服務逾時。", 409: "任務狀態已改變，請重新整理會員任務紀錄。", 413: "DXF 超過 50 MB 大小限制。",
+    422: "輸入錯誤：目前無法處理此圖面或選項，請檢查 DXF 與生成設定。",
     429: "A10 獨立額度尚未開通或已用完，請聯絡管理員。", 503: "A10 建模服務尚未啟用，請稍後再試。" };
-  throw new Error(messages[response.status] || "A10 服務暫時無法回應，請至會員任務紀錄查看。");
+  throw a10PublicError(messages[response.status] || "A10 服務暫時無法回應，請至會員任務紀錄查看。", `A10_HTTP_${response.status}`, response.status >= 500 || response.status === 408);
 }
 
 async function submitA10() {
@@ -1210,61 +1286,132 @@ async function submitA10() {
   const selectedUnit = a10DrawingUnit;
   if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
   const selectedRequestKey = a10RequestKeys.get(file);
+  const view = resetA10View();
+  renderResult(system);
   a10Submitting = true;
   const button = inputStack.querySelector(".generate-button");
   if (button) button.disabled = true;
   try {
-    const config = await a10Response(await fetch(`${getApiBase()}/api/a10/config`));
-    if (!config.enabled) throw new Error("A10 建模服務尚未啟用，請等待主機驗證完成。");
-    if (!config.drawing_units?.includes(selectedUnit)) throw new Error("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
+    const config = await a10FetchJson(`${getApiBase()}/api/a10/config`);
+    if (view !== a10ViewVersion || activeId !== "A10") return;
+    if (!config.enabled) throw a10PublicError("A10 建模服務尚未啟用，請等待主機驗證完成。");
+    if (!config.drawing_units?.includes(selectedUnit)) throw a10PublicError("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
     if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
     const form = new FormData();
     form.append("dxf", file);
     form.append("drawing_unit", selectedUnit);
     form.append("request_key", selectedRequestKey);
-    const data = await a10Response(await fetch(`${getApiBase()}/api/a10/jobs`, {
+    const data = await a10FetchJson(`${getApiBase()}/api/a10/jobs`, {
       method: "POST", headers: getAuthHeaders(), body: form,
-    }));
-    if (activeId === "A10") showResultMessage(system, "任務已送出，正在等待建模主機。關閉此頁不會取消任務。");
-    watchA10(data.job_id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
+    }, { timeoutMs: 120000 });
+    if (view === a10ViewVersion && activeId === "A10") void watchA10(data.job_id);
     loadMemberCenter().catch(() => {});
+  } catch (error) {
+    if (view === a10ViewVersion && activeId === "A10") showResultMessage(system, `${a10ErrorMessage(error)} 若送件狀態不明，請先查看會員任務紀錄，勿重複上傳。`);
   } finally {
     a10Submitting = false;
     if (button) button.disabled = false;
   }
 }
 
+function a10JobFailure(job) {
+  if (["A10_UNIT_CONFLICT", "A10_UNIT_UNRESOLVED"].includes(job.error_code))
+    return "輸入錯誤：圖面單位需要確認，請聯絡管理員檢查此任務；不要重複送件。";
+  if (["unsupported", "needs_review"].includes(job.status) || job.error_code === "A10_UNSUPPORTED")
+    return "輸入錯誤：目前無法可靠處理此圖面，需先確認圖面條件，請聯絡管理員；不要重複送件。";
+  if (["timeout", "timed_out", "expired"].includes(job.status) || job.error_code === "A10_TIMEOUT")
+    return "系統錯誤：建模任務已逾時，系統已保留紀錄，請聯絡管理員；不要重複送件。";
+  if (["cancelled", "canceled"].includes(job.status)) return "任務已取消，請至會員任務紀錄確認。";
+  return job.error_type === "input"
+    ? "輸入錯誤：建模未完成，請確認 DXF 圖面與選項，並聯絡管理員檢查紀錄。"
+    : "系統錯誤：建模未完成，系統已保留紀錄，請聯絡管理員。";
+}
+
+function showA10WatchMessage(watch, message, retryable) {
+  const system = getSystem(watch.systemId);
+  showResultMessage(system, message);
+  if (!retryable) return;
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "text-button";
+  retry.textContent = "重新查詢此任務";
+  retry.addEventListener("click", () => {
+    if (a10ViewVersion === watch.view && activeId === watch.systemId)
+      void watchA10(watch.jobId, watch.systemId);
+  });
+  mainPreview.append(retry);
+}
+
 async function watchA10(jobId, systemId="A10") {
-  const watch = `${jobId}-${crypto.randomUUID()}`;
+  const view = resetA10View();
+  const watch = { jobId, systemId, view, controller: new AbortController() };
   a10Watching = watch;
+  const isCurrent = () => a10Watching === watch && a10ViewVersion === view && activeId === systemId;
+  const deadline = performance.now() + A10_WATCH_DURATION_MS;
   let failures = 0;
-  for (let attempt = 0; attempt < 1440; attempt += 1) {
-    if (a10Watching !== watch || activeId !== systemId) return;
-    let response;
-    try { response = await fetch(`${getApiBase()}/api/jobs/${encodeURIComponent(jobId)}`, { headers: getAuthHeaders() }); }
-    catch {
-      failures += 1;
-      if (failures >= 5) throw new Error("連線中斷；任務可能仍在執行，請至會員任務紀錄查看，勿重複送出。");
-      await wait(5000);
-      continue;
-    }
-    const job = await a10Response(response);
-    failures = 0;
-    if (a10Watching !== watch || activeId !== systemId) return;
-    if (job.status === "completed") { setA10Result(job); loadMemberCenter().catch(() => {}); return; }
-    if (job.status === "failed") {
-      if (["A10_UNIT_CONFLICT", "A10_UNIT_UNRESOLVED"].includes(job.error_code)) throw new Error("圖面單位需要確認，請聯絡管理員檢查此任務；不要重複送件。");
-      throw new Error("建模未完成，系統已保留紀錄，請聯絡管理員。");
-    }
+  activeResultJobId = "";
+  activeResultType = "";
+  thumbGrid.innerHTML = "";
+  const renderProgress = (job = {}, notice = "") => {
     const labels = { queued: "等待建模主機", analyzing: "分析 DXF 圖面", modeling: "建立 SketchUp 模型",
       checking: "檢查模型成果", uploading: "回傳模型檔案" };
     const percent = Math.max(0, Math.min(99, Number(job.progress_percent) || 0));
-    mainPreview.innerHTML = `<div class="a10-model-card" role="status"><strong>${labels[job.stage] || "處理任務中"}</strong>
+    mainPreview.innerHTML = `<div class="a10-model-card" role="status"><strong>${labels[job.stage] || "查詢任務狀態"}</strong>
       <p>階段進度約 ${percent}%</p><progress max="100" value="${percent}" aria-label="建模階段進度"></progress>
-      <p>排隊及複雜圖面可能需要較長時間。可離開頁面，稍後從會員任務紀錄取得成果。</p></div>`;
-    await wait(5000);
+      <p>${escapeHtml(notice || "可離開頁面，稍後從會員任務紀錄取得成果。")}</p>
+      <button type="button" class="text-button" data-a10-stop>停止查詢</button></div>`;
+    mainPreview.querySelector("[data-a10-stop]").addEventListener("click", () => {
+      if (!isCurrent()) return;
+      stopA10Watch();
+      showA10WatchMessage(watch, "已停止查詢；背景任務不受影響。可稍後重新查詢，請勿重複送件。", true);
+    });
+  };
+  try {
+    if (!isCurrent()) return;
+    renderProgress();
+    while (isCurrent() && performance.now() < deadline) {
+      let job;
+      try {
+        job = await a10FetchJson(`${getApiBase()}/api/jobs/${encodeURIComponent(jobId)}`, {
+          headers: getAuthHeaders(), cache: "no-store",
+        }, { signal: watch.controller.signal, timeoutMs: Math.min(A10_STATUS_TIMEOUT_MS, deadline - performance.now()) });
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (performance.now() >= deadline) break;
+        failures += 1;
+        if (!error.retryable || failures >= A10_FETCH_FAILURE_LIMIT) {
+          showA10WatchMessage(watch, `${a10ErrorMessage(error)} 任務可能仍在執行，請至會員任務紀錄查看，勿重複送件。`, error.retryable);
+          return;
+        }
+        renderProgress({}, `${a10ErrorMessage(error)} 正在重新查詢（${failures}/${A10_FETCH_FAILURE_LIMIT}），不會重新送件。`);
+        await a10PollDelay(Math.min(A10_POLL_INTERVAL_MS, deadline - performance.now()), watch.controller.signal);
+        continue;
+      }
+      if (!isCurrent()) return;
+      if (!job || job.job_id !== jobId || (job.system_id && job.system_id !== systemId)) {
+        showA10WatchMessage(watch, "任務回應無法確認，請重新查詢或至會員任務紀錄查看。", true);
+        return;
+      }
+      failures = 0;
+      if (job.status === "completed") { setA10Result(job); loadMemberCenter().catch(() => {}); return; }
+      if (["failed", "timeout", "timed_out", "expired", "unsupported", "needs_review", "cancelled", "canceled"].includes(job.status)) {
+        showA10WatchMessage(watch, a10JobFailure(job), false);
+        return;
+      }
+      if (!["pending", "queued", "running", "processing", "finalizing"].includes(job.status)) {
+        showA10WatchMessage(watch, "任務狀態無法確認，請重新查詢或至會員任務紀錄查看。", true);
+        return;
+      }
+      renderProgress(job);
+      await a10PollDelay(Math.min(A10_POLL_INTERVAL_MS, deadline - performance.now()), watch.controller.signal);
+    }
+    if (isCurrent()) showA10WatchMessage(watch, "本次查詢已到時間上限；任務可能仍在背景處理，請稍後重新查詢，勿重複送件。", true);
+  } catch (error) {
+    if (isCurrent()) showA10WatchMessage(watch, a10ErrorMessage(error), true);
+  } finally {
+    watch.controller.abort();
+    if (a10Watching === watch) a10Watching = null;
   }
-  throw new Error("任務仍在處理，請稍後從會員任務紀錄查看。");
 }
 
 function setA10Result(job) {
@@ -2323,13 +2470,14 @@ function setJobResults(system, job) {
 function openJobResult(index) {
   const job = memberJobs[index];
   if (!job) return;
+  resetA10View();
   const system = systems.find((item) => item.id === job.system_id) || getActiveSystem();
   if (activeId === "A9-3" && system.id !== activeId) a93PresetLoadVersion += 1;
   activeId = system.id;
   renderApp();
 
   if (["A10","A10_V1"].includes(system.id) && job.status !== "completed") {
-    watchA10(job.job_id,system.id).catch((error) => { if (activeId === "A10") showResultMessage(system, error.message); });
+    void watchA10(job.job_id,system.id);
   } else if (system.result === "prompt") {
     promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
   } else {
@@ -3135,6 +3283,7 @@ async function loginWithGoogle() {
 }
 
 async function signOut() {
+  resetA10View();
   const client = getSupabaseClient();
   if (client) await client.auth.signOut();
   localStorage.removeItem(AUTH_TOKEN_KEY);

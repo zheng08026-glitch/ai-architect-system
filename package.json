@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:a10": "node --check app.js && node tests/a10-status.test.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run test:a10 && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
