@@ -61,7 +61,7 @@ function fixture(fetcher, options = {}) {
     const getSystem=id=>systems.find(s=>s.id===id), getActiveSystem=()=>getSystem(activeId);
     const A10_STATUS_TIMEOUT_MS=${options.requestMs || 10}, A10_WATCH_DURATION_MS=${options.watchMs || 1000};
     const A10_POLL_INTERVAL_MS=1, A10_FETCH_FAILURE_LIMIT=5;
-    let a10V1File=null,a10V1Exterior='',a10V1Submitting=false;
+    let a10V1File=null,a10V1Exterior='',a10V1Unit='cm',a10V1Submitting=false;
     const a10V1Keys=new Map(),a10JobVersions=new Map();
     const a10RequestKeys=new WeakMap(),uploadedFiles=new Map();
     let a10Submitting=false,a10DrawingUnit='cm';
@@ -203,7 +203,7 @@ for(const change of ['file','exterior']) {
       const input=f.inputs.querySelector('input');input.files=[{name:'B.dxf',size:10}];input.events.change();
       assert.equal(f.run('a10V1File.name'),'B.dxf');
     }else{
-      const select=f.inputs.querySelector('select');select.value='curtain';select.events.change();
+      const select=f.inputs.querySelector('[data-v1-exterior]');select.value='curtain';select.events.change();
       assert.equal(f.run('a10V1Exterior'),'curtain');
     }
     retry.click();await pause();assert.equal(f.calls.length,5);
@@ -222,7 +222,7 @@ test('wrong job identity and unknown state stop without presenting a completed r
 test('submission uses the same idempotency key on retry and sends explicit mode/finish',async()=>{
   let posts=[];
   const f=fixture((url,init)=>{
-    if(url.endsWith('/config'))return response({enabled:true});
+    if(url.endsWith('/config'))return response({enabled:true,drawing_units:['mm','cm','m']});
     posts.push(Object.fromEntries(init.body.entries()));
     return response({detail:privateDetail},503);
   });
@@ -238,7 +238,7 @@ test('submission uses the same idempotency key on retry and sends explicit mode/
 
 test('a late submit response after navigation does not start a watch or overwrite the new view',async()=>{
   let release;
-  const f=fixture(url=>url.endsWith('/config')?response({enabled:true}):new Promise(r=>{release=r;}));
+  const f=fixture(url=>url.endsWith('/config')?response({enabled:true,drawing_units:['mm','cm','m']}):new Promise(r=>{release=r;}));
   f.context.sampleFile=new Blob(['fixture']);
   f.run('a10V1File=sampleFile');
   const submitting=f.run('submitA10V1(1)');await pause(1);
@@ -263,7 +263,7 @@ for(const change of ['file','exterior','mode']){
     if(change==='file'){
       const input=f.inputs.querySelector('input');input.files=[{name:'B.dxf',size:10}];input.events.change();
     }else if(change==='exterior'){
-      const select=f.inputs.querySelector('select');select.value='solid';select.events.change();
+      const select=f.inputs.querySelector('[data-v1-exterior]');select.value='solid';select.events.change();
     }else{
       f.context.sampleFile=new Blob(['fixture']);f.run('a10V1File=sampleFile');
       await f.run('submitA10V1(2)');
@@ -275,3 +275,38 @@ for(const change of ['file','exterior','mode']){
     assert.equal(f.timers.size,0);
   });
 }
+
+test('submission sends the selected drawing unit and a unit change uses a new idempotency key',async()=>{
+  let posts=[];
+  const f=fixture((url,init)=>{
+    if(url.endsWith('/config'))return response({enabled:true,drawing_units:['mm','cm','m']});
+    posts.push(Object.fromEntries(init.body.entries()));
+    return response({detail:'busy'},503);
+  });
+  f.context.sampleFile=new Blob(['fixture']);
+  f.run(`a10V1File=sampleFile`);
+  await f.run('submitA10V1(1)');
+  f.run(`a10V1Unit='mm'`);
+  await f.run('submitA10V1(1)');await f.run('submitA10V1(1)');
+  assert.equal(posts[0].drawing_unit,'cm');assert.equal(posts[1].drawing_unit,'mm');
+  assert.notEqual(posts[0].request_key,posts[1].request_key);
+  assert.equal(posts[1].request_key,posts[2].request_key);
+});
+
+test('a host without drawing-unit support receives no submission',async()=>{
+  const f=fixture(url=>url.endsWith('/config')?response({enabled:true}):response({job_id:'job-a'}));
+  f.context.sampleFile=new Blob(['fixture']);
+  f.run('a10V1File=sampleFile');
+  await f.run('submitA10V1(1)');
+  assert.equal(f.calls.length,1);assert.match(f.preview.textContent,/單位功能尚未更新/);
+});
+
+test('unit change invalidates an existing watch and its stale retry button',async()=>{
+  const f=fixture(()=>{throw new TypeError('offline');});
+  await f.watch();const retry=f.preview.children[0];
+  f.run('a10V1Inputs()');
+  const select=f.inputs.querySelector('[data-v1-unit]');select.value='m';select.events.change();
+  assert.equal(f.run('a10V1Unit'),'m');
+  retry.click();await pause();assert.equal(f.calls.length,5);
+  assert.equal(f.preview.textContent,'ready');
+});

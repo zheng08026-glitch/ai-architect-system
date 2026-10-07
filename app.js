@@ -312,6 +312,7 @@ const uploadedFiles = new Map();
 // A10-v1 candidate: independent file, mode and idempotency state.
 let a10V1File = null;
 let a10V1Exterior = "";
+let a10V1Unit = "cm";
 let a10V1Submitting = false;
 const a10V1Keys = new Map();
 const a10JobVersions = new Map();
@@ -321,6 +322,9 @@ function a10V1Inputs() {
     <span class="upload-label">上傳 DXF 圖面（最大 50 MB）</span>
     <label class="drop-zone"><span>${a10V1File ? escapeHtml(a10V1File.name) : "選擇 DXF 檔案"}</span>
       <input type="file" accept=".dxf" aria-label="上傳新版 DXF" ${a10V1Submitting ? "disabled" : ""}></label>
+    <label>圖面單位 <select data-v1-unit aria-label="圖面單位" ${a10V1Submitting ? "disabled" : ""}>
+      <option value="cm">公分（cm）</option><option value="mm">毫米（mm）</option><option value="m">公尺（m）</option>
+    </select></label><p class="generation-notice">預設公分，請確認原圖單位；選錯會造成模型尺寸錯誤。</p>
     <label>外牆類型 <select data-v1-exterior aria-label="外牆類型" ${a10V1Submitting ? "disabled" : ""}>
       <option value="">請選擇</option><option value="solid">實體牆面</option><option value="curtain">玻璃帷幕</option>
     </select></label><p class="generation-notice">項目 3、4 必須選擇外牆類型；項目 1、2 不需要。</p>
@@ -337,7 +341,9 @@ function a10V1Inputs() {
     }
     resetA10View();a10V1File=f;a10V1Keys.clear();a10V1Inputs();renderResult(getActiveSystem());
   });
-  const exterior=inputStack.querySelector("select");exterior.value=a10V1Exterior;
+  const unit=inputStack.querySelector("[data-v1-unit]");unit.value=a10V1Unit;
+  unit.addEventListener("change",()=>{resetA10View();a10V1Unit=unit.value;a10V1Inputs();renderResult(getActiveSystem());});
+  const exterior=inputStack.querySelector("[data-v1-exterior]");exterior.value=a10V1Exterior;
   exterior.addEventListener("change",()=>{resetA10View();a10V1Exterior=exterior.value;a10V1Inputs();renderResult(getActiveSystem());});
   inputStack.querySelectorAll("[data-v1-mode]").forEach(button=>button.addEventListener("click",()=>
     submitA10V1(Number(button.dataset.v1Mode)).catch(error=>{
@@ -349,7 +355,7 @@ async function submitA10V1(mode) {
   if(a10V1Submitting)return;
   if(!getAuthToken()){authMessage.textContent="請先登入會員。";authDialog.showModal();return;}
   if(!a10V1File || (mode>2&&!a10V1Exterior))throw a10PublicError("請完成檔案與外牆類型選擇。");
-  const file=a10V1File, exterior=mode>2?a10V1Exterior:"", key=`${mode}:${exterior}`;
+  const file=a10V1File, exterior=mode>2?a10V1Exterior:"", unit=a10V1Unit, key=`${mode}:${exterior}:${unit}`;
   if(!a10V1Keys.has(key))a10V1Keys.set(key,crypto.randomUUID());
   const requestKey=a10V1Keys.get(key);
   const view=resetA10View();
@@ -359,8 +365,9 @@ async function submitA10V1(mode) {
     const config=await a10FetchJson(`${getApiBase()}/api/a10-v1/config`);
     if(view!==a10ViewVersion || activeId!=="A10_V1")return;
     if(!config.enabled)throw a10PublicError("A10-v1 尚未啟用，請稍後再試。");
+    if(!config.drawing_units?.includes(unit))throw a10PublicError("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
     const form=new FormData();form.append("dxf",file);form.append("mode",String(mode));
-    form.append("exterior_type",exterior);form.append("request_key",requestKey);
+    form.append("exterior_type",exterior);form.append("drawing_unit",unit);form.append("request_key",requestKey);
     const data=await a10FetchJson(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form},{timeoutMs:120000});
     a10JobVersions.set(data.job_id,"A10_V1");
     if(view===a10ViewVersion && activeId==="A10_V1")void watchA10(data.job_id,"A10_V1");
