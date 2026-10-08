@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path'
 
 const staticRuntimeFiles = [
   'app.js',
+  'a2-3-editor.js',
+  'a2-3-editor.html',
   'config.js',
   '_headers',
   '_redirects',

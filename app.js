@@ -1,3 +1,7 @@
+// Candidate entry is off by default; localhost preview may opt in without changing public config.
+const a23LocalTest = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+  && new URLSearchParams(location.search).get("a2_3_test") === "1";
+const a23EntryEnabled = window.ARCHITECT_AI_A2_3_ENABLED === true || a23LocalTest;
 const systems = [
   {
     id: "A1-1",
@@ -242,9 +246,19 @@ systems.push({
   inputs: [{ key: "dxf", label: "建築圖面 DXF" }], count: false, prompt: false,
 });
 
+if (a23EntryEnabled) systems.push({
+  id: "A2-3", activeTitle: "A2-3｜局部重繪", title: "局部重繪",
+  subtitle: "圈選範圍・局部修正", desc: "圈出範圍，描述你要改的地方。保留圈外原圖，完成後比較最終成果。",
+  tier: "會員", status: "Live System", result: "image",
+  inputs: [{ key: "original_image", label: "乾淨原圖" }, { key: "mask_image", label: "完整區域遮罩" }],
+  count: false, prompt: true,
+});
+
 const legacyA10 = systems.find(s => s.id === "A10");
 Object.assign(legacyA10, {title:"A10-Bata", displayId:"A10-Bata", activeTitle:"A10-Bata｜2D TO 3D"});
 systems.push({...legacyA10,id:"A10_V1",displayId:"A10-v1",title:"A10-v1",activeTitle:"A10-v1｜2D TO 3D",desc:"上傳 DXF，選擇樓板、建築量體、外牆或外牆含室內隔間。"});
+// Keep the legacy ID only for authenticated history and result downloads.
+Object.assign(legacyA10, {status:"Retired",inputs:[],desc:"A10-Bata 已停止接受新任務。既有成果仍可從會員任務紀錄查看與下載；新的建模任務請使用 A10-v1。"});
 const gridSystems = [
   {
     ...systems.find((system) => system.id === "A1-1"),
@@ -302,11 +316,37 @@ const sidebarGroups = [
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
-gridSystems.push({...systems.find((system) => system.id === "A10"), gridDisplayId: "A10", title: "2D TO 3D"});
-sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF → SketchUp",childIds:["A10","A10_V1"]});
+gridSystems.push({...systems.find((system) => system.id === "A10_V1"), targetId:"A10_V1", gridDisplayId: "A10", title: "2D TO 3D"});
+sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF → SketchUp",childIds:["A10_V1"]});
+if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
 
-let activeId = "A1-1";
-let expandedSidebarGroup = null;
+let activeId = a23LocalTest ? "A2-3" : "A1-1";
+let expandedSidebarGroup = a23LocalTest ? "A2" : null;
+let a23EditorPromise = null;
+
+function renderA23Editor(system) {
+  const active = system.id === "A2-3";
+  const panel = document.querySelector(".tool-panel");
+  panel.classList.toggle("a23-active", active);
+  let host = document.getElementById("a23EditorHost");
+  if (!active) { if (host) host.hidden = true; return; }
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "a23EditorHost";
+    panel.append(host);
+    a23EditorPromise = window.AiasA23Editor.mount(host, {
+      apiBase: getApiBase, token: getAuthToken, email: getAuthEmail, clientId: getClientId,
+      refreshMember: loadMemberCenter,
+      login: () => { authMessage.textContent = "請登入會員後使用 A2-3 局部重繪。"; authDialog.showModal(); },
+    }).catch(() => {
+      host.textContent = "A2-3 編輯器載入失敗，請重新整理。";
+      return null;
+    });
+  }
+  host.hidden = false;
+  // Retain one editor instance across route changes, preserving masks and exact-job polling.
+  a23EditorPromise?.then(editor => { editor?.resize(); editor?.refreshAccess(); });
+}
 const previews = new Map();
 const uploadedFiles = new Map();
 // A10-v1 candidate: independent file, mode and idempotency state.
@@ -377,9 +417,6 @@ async function submitA10V1(mode) {
   } finally {a10V1Submitting=false;if(activeId==="A10_V1")a10V1Inputs();}
 }
 
-const a10RequestKeys = new WeakMap();
-let a10Submitting = false;
-let a10DrawingUnit = "cm";
 let a10Watching = null;
 let a10ViewVersion = 0;
 const A10_STATUS_TIMEOUT_MS = 15000;
@@ -545,6 +582,9 @@ function getPublicJobError(job = {}) {
   const rawMessage = String(job.public_error || job.error || "");
   const publicMessage = String(job.public_error || "");
   if (!rawMessage && job.status !== "failed") return "";
+  if (job.system_id === "A2-3") {
+    return job.error_type === "input" ? PUBLIC_INPUT_JOB_ERROR_MESSAGE : PUBLIC_SYSTEM_JOB_ERROR_MESSAGE;
+  }
   if (publicMessage.includes("輸入錯誤") || publicMessage.includes("系統錯誤")) {
     return publicMessage;
   }
@@ -649,12 +689,12 @@ function renderJobList(records = []) {
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
             ${
-              hasResult || (["A10","A10_V1"].includes(job.system_id) && ["pending", "processing", "finalizing"].includes(job.status))
+              (hasResult && (job.system_id !== "A2-3" || a23EntryEnabled)) || (["A10","A10_V1", ...(a23EntryEnabled ? ["A2-3"] : [])].includes(job.system_id) && ["pending", "processing", "finalizing"].includes(job.status))
                 ? `<button type="button" class="text-button" data-open-job="${index}">${hasResult ? "查看成果" : "查看進度"}</button>`
                 : ""
             }
             ${
-              downloadUrl
+              downloadUrl && job.system_id !== "A2-3"
                 ? `<a class="text-button" href="${escapeHtml(downloadUrl)}" download target="_blank" rel="noreferrer">下載</a>`
                 : ""
             }
@@ -995,6 +1035,7 @@ function updateAuthUi() {
   if (authButton) authButton.textContent = email ? "會員中心" : "登入";
   if (!email) setAdminVisible(false);
   setMemberCenterVisible(Boolean(email));
+  a23EditorPromise?.then(editor => editor?.refreshAccess());
   if (authMessage) {
     authMessage.textContent = email
       ? `已登入：${email}`
@@ -1149,7 +1190,7 @@ function systemCard(system) {
   card.innerHTML = `
     <div class="system-card-top">
       <span class="system-id">${system.gridDisplayId || system.displayId || system.id}</span>
-      <span class="status-pill ${system.status === "Live System" ? "with-dot" : "pending"}">${system.id === "A10" ? "整合測試版" : system.status}</span>
+      <span class="status-pill ${system.status === "Live System" ? "with-dot" : "pending"}">${system.status}</span>
     </div>
     <h3>${system.title}</h3>
     <p>${system.subtitle}</p>
@@ -1165,46 +1206,6 @@ function systemCard(system) {
     activateSystem(targetId, targetGroup?.childIds ? targetGroup.id : null);
   });
   return card;
-}
-
-function a10UploadField() {
-  const wrapper = document.createElement("div");
-  wrapper.className = "upload-box";
-  const file = uploadedFiles.get("A10-dxf");
-  wrapper.innerHTML = `<span class="upload-label">建築圖面 DXF（最大 50 MB）</span>
-    <label>圖面單位 <select aria-label="圖面單位" data-a10-unit>
-      <option value="cm">公分（cm）</option><option value="mm">毫米（mm）</option><option value="m">公尺（m）</option>
-    </select></label><small>預設公分，請確認原圖單位；選錯會造成模型尺寸錯誤。數字的用途仍依圖面位置判讀。</small>
-    <label class="drop-zone a10-drop-zone"><span>${file ? escapeHtml(file.name) : "選擇或拖入 DXF 檔案"}</span>
-    <small>${file ? `${(file.size / 1024 / 1024).toFixed(2)} MB・點此更換` : "可包含平面、立面與剖面。不接受 DWG / ZIP / RB。"}</small>
-    <input type="file" accept=".dxf" aria-label="上傳建築 DXF" /></label><p class="generation-notice" role="status"></p>`;
-  const unitSelect = wrapper.querySelector("[data-a10-unit]");
-  unitSelect.value = a10DrawingUnit;
-  unitSelect.disabled = a10Submitting;
-  unitSelect.addEventListener("change", () => {
-    resetA10View();
-    renderResult(getActiveSystem());
-    a10DrawingUnit = unitSelect.value;
-    const current = uploadedFiles.get("A10-dxf");
-    if (current) a10RequestKeys.set(current, crypto.randomUUID());
-  });
-  const select = (candidate) => {
-    const message = wrapper.querySelector('[role="status"]');
-    if (!candidate) return;
-    if (!/\.dxf$/i.test(candidate.name) || candidate.size === 0 || candidate.size > 50 * 1024 * 1024) {
-      message.textContent = "請選擇非空白、50 MB 以下的 DXF 檔案。";
-      return;
-    }
-    resetA10View();
-    uploadedFiles.set("A10-dxf", candidate);
-    a10RequestKeys.set(candidate, crypto.randomUUID());
-    renderApp();
-  };
-  wrapper.querySelector("input").addEventListener("change", (event) => select(event.target.files[0]));
-  const zone = wrapper.querySelector(".drop-zone");
-  zone.addEventListener("dragover", (event) => event.preventDefault());
-  zone.addEventListener("drop", (event) => { event.preventDefault(); select(event.dataTransfer.files[0]); });
-  return wrapper;
 }
 
 function a10PublicError(message, code = "A10_PUBLIC_ERROR", retryable = false) {
@@ -1281,44 +1282,7 @@ async function a10Response(response) {
 }
 
 async function submitA10() {
-  if (a10Submitting) return;
-  const system = systems.find((item) => item.id === "A10");
-  if (!getAuthToken()) {
-    authMessage.textContent = "請先登入會員後使用 A10。A10 使用獨立額度。";
-    authDialog.showModal();
-    return;
-  }
-  const file = uploadedFiles.get("A10-dxf");
-  if (!file) throw new Error("請先上傳建築 DXF 檔案。");
-  const selectedUnit = a10DrawingUnit;
-  if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
-  const selectedRequestKey = a10RequestKeys.get(file);
-  const view = resetA10View();
-  renderResult(system);
-  a10Submitting = true;
-  const button = inputStack.querySelector(".generate-button");
-  if (button) button.disabled = true;
-  try {
-    const config = await a10FetchJson(`${getApiBase()}/api/a10/config`);
-    if (view !== a10ViewVersion || activeId !== "A10") return;
-    if (!config.enabled) throw a10PublicError("A10 建模服務尚未啟用，請等待主機驗證完成。");
-    if (!config.drawing_units?.includes(selectedUnit)) throw a10PublicError("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
-    if (!a10RequestKeys.has(file)) a10RequestKeys.set(file, crypto.randomUUID());
-    const form = new FormData();
-    form.append("dxf", file);
-    form.append("drawing_unit", selectedUnit);
-    form.append("request_key", selectedRequestKey);
-    const data = await a10FetchJson(`${getApiBase()}/api/a10/jobs`, {
-      method: "POST", headers: getAuthHeaders(), body: form,
-    }, { timeoutMs: 120000 });
-    if (view === a10ViewVersion && activeId === "A10") void watchA10(data.job_id);
-    loadMemberCenter().catch(() => {});
-  } catch (error) {
-    if (view === a10ViewVersion && activeId === "A10") showResultMessage(system, `${a10ErrorMessage(error)} 若送件狀態不明，請先查看會員任務紀錄，勿重複上傳。`);
-  } finally {
-    a10Submitting = false;
-    if (button) button.disabled = false;
-  }
+  throw a10PublicError("A10-Bata 已停止接受新任務，請改用 A10-v1。既有成果仍可下載。");
 }
 
 function a10JobFailure(job) {
@@ -1480,7 +1444,6 @@ async function downloadA10(jobId, kind) {
 }
 
 function uploadField(input) {
-  if (activeId === "A10") return a10UploadField();
   const wrapper = document.createElement("div");
   wrapper.className = "upload-box";
   const key = `${activeId}-${input.key}`;
@@ -2103,23 +2066,19 @@ function renderHowToUse(system) {
   }
 
   let textGuide = document.getElementById("a10HowToUse");
-  if (!textGuide) {
+  if (!textGuide && isA10) {
     textGuide = document.createElement("div");
     textGuide.id = "a10HowToUse";
     textGuide.className = "a10-how-to-use";
-    textGuide.innerHTML = `<p><strong>2D to 3D｜DXF to Skp · 整合測試版</strong></p>
+    textGuide.innerHTML = `<p><strong>A10-Bata｜歷史任務</strong></p>
       <ol>
-        <li>登入會員，確認 A10 獨立額度。A10 不包含於 A1–A9 的既有額度。</li>
-        <li>上傳建築 DXF（上限 50 MB），確認圖面單位：預設公分，可改毫米或公尺。選錯會造成模型尺寸錯誤。建議包含平面、立面與剖面；目前不接受 DWG、PDF 或圖片作為輸入。</li>
-        <li>按「開始建立 3D 模型」，查看排隊與處理狀態。時間依圖面複雜度及排隊情況而定，無須重複送件。</li>
-        <li>完成後下載 SKP 與建模摘要；離開頁面後，可登入會員任務紀錄取件。</li>
-        <li>用 SketchUp 開啟模型，核對牆、柱、樓板及尺寸後再編輯使用。</li>
-      </ol>
-      <p>缺少部分圖面時，依可辨識內容建立模型；缺標註時暫用樓高 320 cm、樓板 15 cm、屋突 300 cm、女兒牆 110 cm。無屋突圖則略過屋突。預設值不是圖面實測值。</p>
-      <p>成果供提案與設計調整，不代表完整施工模型。第一版網頁提供 SKP 與摘要下載，尚不提供 RB 下載。正式啟用前須完成全流程驗收；每位會員一次性初始 3 次，不按月重置；用完由管理員加額。</p>`;
+        <li>此版本已停止接受新任務。請從會員中心的近期任務開啟既有紀錄。</li>
+        <li>已完成的任務仍可下載 SKP 與建模摘要；下載會驗證原任務擁有者的會員身分。</li>
+        <li>新的 DXF 建模任務請使用 A10-v1。A10 獨立額度與會員用量紀錄保留不變。</li>
+      </ol>`;
     howToUsePopover.append(textGuide);
   }
-  textGuide.hidden = !isA10;
+  if (textGuide) textGuide.hidden = !isA10;
   howToUseImage.hidden = isA10 || !guideSrc;
   if (!hasGuide) return;
 
@@ -2135,6 +2094,12 @@ function toggleHowToUse() {
 }
 
 function renderInputs(system) {
+  if(system.id === "A10") {
+    inputStack.classList.remove("multi-image-inputs");
+    inputStack.innerHTML = '<p class="generation-notice">A10-Bata 已停止接受新任務。此頁僅供查看與下載既有成果。</p><button type="button" class="text-button" data-open-a10-v1>前往 A10-v1</button>';
+    inputStack.querySelector("[data-open-a10-v1]").addEventListener("click",()=>activateSystem("A10_V1","A10"));
+    return;
+  }
   if(system.id === "A10_V1") {a10V1Inputs();return;}
   inputStack.innerHTML = "";
   inputStack.classList.toggle("multi-image-inputs", system.inputs.length >= 4);
@@ -2148,7 +2113,7 @@ function renderInputs(system) {
   generateButton.className = "generate-button";
   generateButton.type = "button";
   generateButton.textContent =
-    system.id === "A10" ? "開始建立 3D 模型" : system.result === "prompt"
+    system.result === "prompt"
       ? "產生提示詞"
       : system.result === "video"
         ? "AI製作影片"
@@ -2156,7 +2121,6 @@ function renderInputs(system) {
           ? "生成 8 個建築視角"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
-  if (system.id === "A10") generateButton.disabled = a10Submitting;
   inputStack.append(generateButton);
 
   const usageNotice = document.createElement("p");
@@ -2164,12 +2128,6 @@ function renderInputs(system) {
   usageNotice.innerHTML =
     'AI 成果僅供提案、設計討論與概念視覺化，可能有錯誤或變形，送出前請確認素材權利，使用與公開發布前請自行檢查。<a href="#usage-notice">查看完整使用須知</a>';
   inputStack.append(usageNotice);
-  if (system.id === "A10") {
-    const policy = document.createElement("p");
-    policy.className = "generation-notice";
-    policy.textContent = "A10 使用獨立額度，不扣 A1–A8／A9 次數。缺高度時依建模規則暫用樓高 320 cm、樓板 15 cm、屋突 300 cm、女兒牆 110 cm；無屋突圖則略過。圖面大小、複雜度與排隊情況會影響時間。";
-    inputStack.append(policy);
-  }
 }
 
 function renderResult(system) {
@@ -2200,7 +2158,9 @@ function renderResult(system) {
 
   if (["A10","A10_V1"].includes(system.id)) {
     resultTitle.textContent = "SketchUp 模型";
-    mainPreview.innerHTML = '<div class="a10-model-card"><strong>DXF → SketchUp</strong><p>上傳圖面 → 排隊分析 → 建立模型 → 下載 SKP</p><small>成果為可編輯模型，不是渲染圖片。模型完成後會出現在會員任務紀錄。</small></div>';
+    mainPreview.innerHTML = system.id === "A10"
+      ? '<div class="a10-model-card"><strong>A10 歷史成果</strong><p>請從會員任務紀錄開啟既有成果，再下載 SKP 或建模摘要。</p></div>'
+      : '<div class="a10-model-card"><strong>DXF → SketchUp</strong><p>上傳圖面 → 排隊分析 → 建立模型 → 下載 SKP</p><small>成果為可編輯模型，不是渲染圖片。模型完成後會出現在會員任務紀錄。</small></div>';
     thumbGrid.innerHTML = "";
     return;
   }
@@ -2483,6 +2443,13 @@ function openJobResult(index) {
   activeId = system.id;
   renderApp();
 
+  if (system.id === "A2-3") {
+    a23EditorPromise?.then(editor => editor?.openJob(job.job_id));
+    document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+    authDialog.close();
+    return;
+  }
+
   if (["A10","A10_V1"].includes(system.id) && job.status !== "completed") {
     void watchA10(job.job_id,system.id);
   } else if (system.result === "prompt") {
@@ -2714,9 +2681,11 @@ function renderApp() {
   activeTitle.textContent =
     system.activeTitle || `${system.displayId || system.id} ${system.title}`;
   activeDesc.textContent = system.desc;
-  activeStatus.textContent = system.id === "A10" ? "整合測試版" : system.status;
+  activeStatus.textContent = system.id === "A10" ? "僅供歷史成果" : system.status;
   activeStatus.classList.toggle("pending", system.status !== "Live System");
 
+  renderA23Editor(system);
+  if (system.id === "A2-3") { renderHowToUse(system); return; }
   renderInputs(system);
   renderResult(system);
   renderHowToUse(system);

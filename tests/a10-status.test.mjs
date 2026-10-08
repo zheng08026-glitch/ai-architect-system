@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const implementation = [
-  section('function a10V1Inputs()', 'const a10RequestKeys'),
+  section('function a10V1Inputs()', 'let a10Watching'),
   section('function a10PublicError(', 'function setA10Result('),
   section('function openJobResult(', 'function renderJobProgress('),
   section('function activateSystem(', 'function systemButton('),
@@ -76,6 +76,12 @@ const response = (body, status=200) => ({ ok: status >= 200 && status < 300, sta
 const job = (status, extra={}) => ({ job_id:'job-a', system_id:'A10_V1', status, ...extra });
 const pause = (ms=5) => new Promise(r=>setTimeout(r,ms));
 const privateDetail = 'Traceback C:\\private\\secret.py token=secret http://192.0.2.1/internal';
+
+test('retired A10 refuses new submissions without calling an API', async () => {
+  const f = fixture(() => { throw new Error('retired submission must not make a request'); });
+  await assert.rejects(f.context.submitA10(), /A10-Bata/);
+  assert.equal(f.calls.length, 0);
+});
 
 test('production timing limits remain 15 seconds and two hours', () => {
   assert.match(source, /A10_STATUS_TIMEOUT_MS = 15000/);

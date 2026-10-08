@@ -714,6 +714,10 @@ section {
   margin: 0;
 }
 
+.tool-panel.a23-active > .tool-body { display: none; }
+#a23EditorHost[hidden] { display: none; }
+#a23EditorHost { min-width: 0; }
+
 .workspace-grid {
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
