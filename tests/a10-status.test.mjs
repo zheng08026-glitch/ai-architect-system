@@ -242,6 +242,20 @@ test('submission uses the same idempotency key on retry and sends explicit mode/
   assert.doesNotMatch(f.preview.textContent,/secret/);
 });
 
+test('a file above the host upload limit is stopped before posting',async()=>{
+  let posts=0;
+  const f=fixture((url)=>{
+    if(url.endsWith('/config'))return response({enabled:true,drawing_units:['mm','cm','m'],max_upload_bytes:4});
+    posts+=1;return response({job_id:'job-x'});
+  });
+  f.context.sampleFile=new Blob(['fixture'],{type:'application/octet-stream'});
+  f.run('a10V1File=sampleFile');
+  await f.run('submitA10V1(1)').catch(error=>f.run('a10ErrorMessage')(error));
+  assert.equal(posts,0);
+  assert.equal(f.run('a10V1Submitting'),false);
+  assert.equal(f.run('A10_V1_MAX_BYTES'),95*1024*1024);
+});
+
 test('a late submit response after navigation does not start a watch or overwrite the new view',async()=>{
   let release;
   const f=fixture(url=>url.endsWith('/config')?response({enabled:true,drawing_units:['mm','cm','m']}):new Promise(r=>{release=r;}));

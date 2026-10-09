@@ -359,7 +359,7 @@ const a10JobVersions = new Map();
 
 function a10V1Inputs() {
   inputStack.innerHTML = `<div class="upload-box">
-    <span class="upload-label">上傳 DXF 圖面（最大 50 MB）</span>
+    <span class="upload-label">上傳 DXF 圖面（最大 ${A10_V1_MAX_MB} MB）</span>
     <label class="drop-zone"><span>${a10V1File ? escapeHtml(a10V1File.name) : "選擇 DXF 檔案"}</span>
       <input type="file" accept=".dxf" aria-label="上傳新版 DXF" ${a10V1Submitting ? "disabled" : ""}></label>
     <label>圖面單位 <select data-v1-unit aria-label="圖面單位" ${a10V1Submitting ? "disabled" : ""}>
@@ -376,8 +376,8 @@ function a10V1Inputs() {
   input.addEventListener("change", () => {
     const f = input.files[0];
     if (!f) return;
-    if (!/\.dxf$/i.test(f.name) || !f.size || f.size>50*1024*1024) {
-      inputStack.querySelector("[data-v1-error]").textContent="請選擇非空白、50 MB 以下的 DXF。";return;
+    if (!/\.dxf$/i.test(f.name) || !f.size || f.size>A10_V1_MAX_BYTES) {
+      inputStack.querySelector("[data-v1-error]").textContent=`請選擇非空白、${A10_V1_MAX_MB} MB 以下的 DXF。`;return;
     }
     resetA10View();a10V1File=f;a10V1Keys.clear();a10V1Inputs();renderResult(getActiveSystem());
   });
@@ -390,6 +390,10 @@ function a10V1Inputs() {
       if(activeId==="A10_V1")showResultMessage(getActiveSystem(),a10ErrorMessage(error));
     })));
 }
+
+// A10-v1 uploads pass through the Cloudflare tunnel (100 MB request limit); 95 MB leaves room for the form.
+const A10_V1_MAX_MB = 95;
+const A10_V1_MAX_BYTES = A10_V1_MAX_MB * 1024 * 1024;
 
 async function submitA10V1(mode) {
   if(a10V1Submitting)return;
@@ -406,9 +410,10 @@ async function submitA10V1(mode) {
     if(view!==a10ViewVersion || activeId!=="A10_V1")return;
     if(!config.enabled)throw a10PublicError("A10-v1 尚未啟用，請稍後再試。");
     if(!config.drawing_units?.includes(unit))throw a10PublicError("主機單位功能尚未更新，本次未送件。請聯絡管理員。");
+    if(config.max_upload_bytes && file.size>config.max_upload_bytes)throw a10PublicError(`此 DXF 超過主機目前的上傳上限（${Math.floor(config.max_upload_bytes/1048576)} MB），本次未送件、未扣額。`);
     const form=new FormData();form.append("dxf",file);form.append("mode",String(mode));
     form.append("exterior_type",exterior);form.append("drawing_unit",unit);form.append("request_key",requestKey);
-    const data=await a10FetchJson(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form},{timeoutMs:120000});
+    const data=await a10FetchJson(`${getApiBase()}/api/a10-v1/jobs`,{method:"POST",headers:getAuthHeaders(),body:form},{timeoutMs:600000});
     a10JobVersions.set(data.job_id,"A10_V1");
     if(view===a10ViewVersion && activeId==="A10_V1")void watchA10(data.job_id,"A10_V1");
     loadMemberCenter().catch(()=>{});
@@ -1275,7 +1280,7 @@ async function a10Response(response) {
   // Small public categories; never display raw proxy, engine, or filesystem diagnostics.
   const messages = { 400: "請檢查 DXF 格式與檔案內容。", 401: "請先登入會員，或重新登入後再試。",
     403: "此帳號目前無法使用 A10，請聯絡管理員。", 404: "找不到任務或沒有存取權限。",
-    408: "查詢服務逾時。", 409: "任務狀態已改變，請重新整理會員任務紀錄。", 413: "DXF 超過 50 MB 大小限制。",
+    408: "查詢服務逾時。", 409: "任務狀態已改變，請重新整理會員任務紀錄。", 413: "DXF 超過上傳大小限制，本次未送件。",
     422: "輸入錯誤：目前無法處理此圖面或選項，請檢查 DXF 與生成設定。",
     429: "A10 獨立額度尚未開通或已用完，請聯絡管理員。", 503: "A10 建模服務尚未啟用，請稍後再試。" };
   throw a10PublicError(messages[response.status] || "A10 服務暫時無法回應，請至會員任務紀錄查看。", `A10_HTTP_${response.status}`, response.status >= 500 || response.status === 408);
