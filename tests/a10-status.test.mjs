@@ -156,6 +156,19 @@ for (const kind of ['network','fetch-stall','body-stall','invalid-json','server-
   });
 }
 
+test('processing shows the host stage name, falls back for an older host, and escapes it',async()=>{
+  const seen=[];
+  const replies=[job('processing',{stage:'compiling_2',stage_label:'建立模型幾何 2/4',progress_percent:28}),
+    job('processing',{stage:'modeling',progress_percent:88}),
+    job('processing',{stage:'features',stage_label:'<b>x',progress_percent:60}),job('completed')];
+  const f=fixture((url,init,n)=>{if(n>1)seen.push(f.preview.innerHTML);return response(replies[n-1]);});
+  await f.watch();
+  assert.match(seen[0],/建立模型幾何 2\/4/);assert.match(seen[0],/28%/);
+  assert.match(seen[1],/建立 SketchUp 模型/);
+  assert.match(seen[2],/&lt;b>x/);assert.doesNotMatch(seen[2],/<b>x/);
+  assert.equal(f.results.length,1);
+});
+
 test('a real elapsed deadline ends even a continuing successful pending sequence',async()=>{
   const f=fixture(()=>response(job('pending')),{watchMs:15});
   await f.watch();

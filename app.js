@@ -1332,7 +1332,9 @@ async function watchA10(jobId, systemId="A10") {
     const labels = { queued: "等待建模主機", analyzing: "分析 DXF 圖面", modeling: "建立 SketchUp 模型",
       checking: "檢查模型成果", uploading: "回傳模型檔案" };
     const percent = Math.max(0, Math.min(99, Number(job.progress_percent) || 0));
-    mainPreview.innerHTML = `<div class="a10-model-card" role="status"><strong>${labels[job.stage] || "查詢任務狀態"}</strong>
+    // The host names finer stages (e.g. 建立模型幾何 2/4); the local names cover an older host.
+    const stageLabel = job.stage_label || labels[job.stage] || "查詢任務狀態";
+    mainPreview.innerHTML = `<div class="a10-model-card" role="status"><strong>${escapeHtml(stageLabel)}</strong>
       <p>階段進度約 ${percent}%</p><progress max="100" value="${percent}" aria-label="建模階段進度"></progress>
       <p>${escapeHtml(notice || "可離開頁面，稍後從會員任務紀錄取得成果。")}</p>
       <button type="button" class="text-button" data-a10-stop>停止查詢</button></div>`;
