@@ -1,10 +1,11 @@
 /* A2-3 editor adapted from the supplied prototype. All tools stay independent of other systems. */
 'use strict';
 window.AiasA23Editor = { async mount(element, platform) {
- const response = await fetch('./a2-3-editor.html', {cache:'no-cache'});
+ const response = await fetch('./a2-3-editor.html?v=a23-progress-compare-20261012-r2', {cache:'no-cache'});
  if (!response.ok) throw new Error('A2-3 編輯器載入失敗，請重新整理。');
  const root=element.attachShadow({mode:'open'});
  root.innerHTML=await response.text();
+ element.dataset.a23Version='a23-progress-compare-20261012-r2';
  const $ = id => root.getElementById(id);
  const stage=$('stage'), host=$('workspace'), ctx=stage.getContext('2d');
  const makeCanvas=()=>document.createElement('canvas');
