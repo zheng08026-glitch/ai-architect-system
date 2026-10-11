@@ -30,6 +30,7 @@
   --soft: #7d88ac;
   --cyan: #23f2c3;
   --violet: #8d4dff;
+  --job-progress-fill: linear-gradient(90deg, var(--cyan), var(--violet));
   --amber: #f4bd59;
   --danger: #ff6b91;
   --radius: 8px;
@@ -1497,7 +1498,7 @@ input {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  background: var(--job-progress-fill);
   transition: width 0.5s ease;
 }
 
@@ -2670,7 +2671,21 @@ body[data-theme="white"] .badge::before {
 .a10-drop-zone { min-height: 180px; display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
 .a10-model-card { width: 100%; padding: 28px; text-align: left; line-height: 1.7; overflow-wrap: anywhere; }
 .a10-model-card strong { font-size: 1.35rem; }
-.a10-model-card progress { width: 100%; accent-color: #4b7770; }
+.a10-model-card progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  accent-color: var(--cyan);
+}
+.a10-model-card progress::-webkit-progress-bar { background: transparent; border-radius: inherit; }
+.a10-model-card progress::-webkit-progress-value { background: var(--job-progress-fill); border-radius: inherit; }
+.a10-model-card progress::-moz-progress-bar { background: var(--job-progress-fill); border-radius: inherit; }
 .a10-model-card small { opacity: .75; }
 .a10-drop-zone + [role="status"]:empty { display: none; }
 .a10-how-to-use {

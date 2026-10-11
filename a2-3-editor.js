@@ -13,7 +13,9 @@ window.AiasA23Editor = { async mount(element, platform) {
  const tctx=tint.getContext('2d'), ectx=edge.getContext('2d');
  const state={loaded:false,w:0,h:0,source:null,ops:[],redo:[],tool:'lasso',view:'edit',draft:null,polygon:[],hover:null,pointer:null,panDrag:null,space:false,zoom:1,x:0,y:0,count:0,bounds:null,binary:null,busy:false,preset:null};
  let toastTimer,raf=0,uploadSequence=0;
- const job={id:'',active:false,run:0,original:null,final:null,originalUrl:'',finalUrl:''};
+ const job={id:'',active:false,run:0,original:null,final:null,originalUrl:'',finalUrl:'',canCompare:false};
+ const progress={phase:0,startedAt:0,timer:null};
+ let comparisonMode='side';
  let accessAllowed=false,accessSequence=0,owner=platform.email();
  const PENDING_KEY='aias-a2-3-pending-job';
  const SUBMISSION_KEY='aias-a2-3-pending-submission';
@@ -151,7 +153,7 @@ window.AiasA23Editor = { async mount(element, platform) {
  $('brushSize').addEventListener('input',()=>{$('brushLabel').textContent=$('brushSize').value;scheduleDraw();});$('opacity').addEventListener('input',()=>{$('opacityLabel').textContent=$('opacity').value;scheduleDraw();});
  $('prompt').addEventListener('input',()=>{state.preset=null;updateUI();});
  root.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{const val=presets[b.dataset.preset];if($('prompt').value.trim()&&$('prompt').value!==val&&!confirm('套用此參考提詞會取代目前的修改內容，確定繼續？'))return;$('prompt').value=val;state.preset=b.dataset.preset;updateUI();}));
- root.addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA'].includes((root.activeElement?.tagName))||state.busy)return;if(ev.code==='Space'){ev.preventDefault();state.space=true;scheduleDraw();}if(ev.key==='Escape')cancelDraft();if(ev.key==='Enter'&&state.tool==='polygon'){ev.preventDefault();finishPolygon();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){ev.preventDefault();ev.shiftKey?redo():undo();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='y'){ev.preventDefault();redo();}});
+ root.addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA','BUTTON','SELECT','A','SUMMARY'].includes((root.activeElement?.tagName))||state.busy)return;if(ev.code==='Space'){ev.preventDefault();state.space=true;scheduleDraw();}if(ev.key==='Escape')cancelDraft();if(ev.key==='Enter'&&state.tool==='polygon'){ev.preventDefault();finishPolygon();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){ev.preventDefault();ev.shiftKey?redo():undo();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='y'){ev.preventDefault();redo();}});
  root.addEventListener('keyup',ev=>{if(ev.code==='Space'){state.space=false;scheduleDraw();}});window.addEventListener('blur',()=>{state.space=false;cancelDraft();});
  async function loadFile(file){
   if(!file||state.busy)return;
@@ -226,12 +228,72 @@ window.AiasA23Editor = { async mount(element, platform) {
   // Accept only the matching fixed public message; never render arbitrary service text.
   return data.message===expected?data.message:expected;
  }
- function jobMessage(message,error=false){$('jobStatus').classList.remove('hide');$('jobStatus').classList.toggle('error',error);$('jobMessage').textContent=message;$('jobIdentity').textContent=job.id?`任務編號：${job.id}`:'';}
+ function jobMessage(message,error=false){$('jobStatus').classList.remove('hide');$('jobStatus').classList.toggle('error',error);if($('jobMessage').textContent!==message)$('jobMessage').textContent=message;$('jobIdentity').textContent=job.id?`任務編號：${job.id}`:'';}
+ function stopProgressClock(){clearInterval(progress.timer);progress.timer=null;}
+ function updateElapsed(){
+  const seconds=Math.max(0,Math.floor((Date.now()-progress.startedAt)/1000));
+  const text=`已等待 ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+  root.querySelectorAll('[data-progress-elapsed]').forEach(el=>el.textContent=text);
+ }
+ function resetProgress(){
+  stopProgressClock();progress.startedAt=0;progress.phase=0;
+  $('canvasProgress').classList.add('hide');$('jobProgress').classList.add('hide');host.setAttribute('aria-busy','false');
+ }
+ // The API reports measured stages, not sampler percentages or queue positions.
+ function showProgress(phase,title,detail='',tone='active'){
+  progress.phase=phase;
+  if(!progress.startedAt)progress.startedAt=Date.now();
+  const active=tone==='active',complete=tone==='complete';
+  if(active&&!progress.timer)progress.timer=setInterval(updateElapsed,1000);
+  if(!active)stopProgressClock();
+  updateElapsed();host.setAttribute('aria-busy',String(active));
+  for(const id of ['canvasProgress','jobProgress']){
+   const el=$(id);el.classList.remove('hide');el.classList.toggle('paused',!active);el.classList.toggle('complete',complete);el.dataset.tone=tone;
+   el.querySelectorAll('[data-progress-step]').forEach(step=>{
+    const index=Number(step.dataset.progressStep);step.classList.toggle('done',complete||index<phase);step.classList.toggle('current',!complete&&index===phase);
+   });
+  }
+  $('canvasProgress').classList.toggle('hide',complete);
+  root.querySelectorAll('[data-progress-title]').forEach(el=>el.textContent=title);
+  root.querySelectorAll('[data-progress-detail]').forEach(el=>el.textContent=detail);
+  root.querySelectorAll('[data-progress-phase-label]').forEach(el=>el.textContent=complete?'全部完成':`階段 ${phase+1} / 5`);
+  $('jobProgress').setAttribute('aria-valuetext',title);
+  jobMessage(title,tone==='error');
+ }
+ function showRecordProgress(record){
+  if(['pending','queued'].includes(record.status)){
+   showProgress(1,'任務已送達，等候處理中','已收到這筆任務，請勿重複送件。');return;
+  }
+  if(record.status==='finalizing'||record.stage==='uploading'){
+   showProgress(4,'正在回傳最終成果','正在檢查並整理這筆任務的成果。');return;
+  }
+  if(['analyzing','encoding'].includes(record.stage)){
+   showProgress(2,'正在準備圖片','正在處理本次送出的原圖與圈選範圍。');return;
+  }
+  showProgress(3,'AI 正在局部重繪','生成仍在進行，完成後會自動顯示成果。');
+ }
+ function setComparisonPosition(){
+  const position=Math.max(0,Math.min(100,Number($('compareSlider').value)||0));
+  $('overlayOriginal').style.clipPath=`inset(0 ${100-position}% 0 0)`;
+  $('compareDivider').style.left=`${position}%`;
+  $('comparePosition').textContent=`原圖 ${position}% ／ 成果 ${100-position}%`;
+  $('compareSlider').setAttribute('aria-valuetext',`原圖顯示 ${position}%，成果顯示 ${100-position}%`);
+ }
+ function setComparisonMode(mode){
+  comparisonMode=job.canCompare&&mode==='overlay'?'overlay':'side';
+  const overlay=comparisonMode==='overlay';
+  $('comparison').classList.toggle('hide',!job.final||overlay);
+  $('overlayComparison').classList.toggle('hide',!job.final||!overlay);
+  $('compareToggle').classList.toggle('hide',!job.final||!job.canCompare);
+  $('compareToggle').setAttribute('aria-pressed',String(overlay));
+  $('compareToggle').textContent=overlay?'切換左右比對':'切換疊圖比對';
+ }
  function clearResult(){
   if(job.originalUrl)URL.revokeObjectURL(job.originalUrl);
   if(job.finalUrl)URL.revokeObjectURL(job.finalUrl);
-  Object.assign(job,{original:null,final:null,originalUrl:'',finalUrl:''});
-  $('submittedOriginal').removeAttribute('src');$('finalImage').removeAttribute('src');
+  Object.assign(job,{original:null,final:null,originalUrl:'',finalUrl:'',canCompare:false});
+  for(const id of ['submittedOriginal','finalImage','overlayOriginal','overlayFinal'])$(id).removeAttribute('src');
+  comparisonMode='side';$('compareSlider').value='50';setComparisonPosition();setComparisonMode('side');
   $('comparison').classList.add('hide');$('resultControls').classList.add('hide');$('resultPlaceholder').classList.remove('hide');$('resultJobId').textContent='';
  }
  function rememberJob(){try{localStorage.setItem(PENDING_KEY,JSON.stringify({id:job.id,owner}));}catch{/* The active page can still poll when storage is unavailable. */}}
@@ -261,7 +323,7 @@ window.AiasA23Editor = { async mount(element, platform) {
   const sequence=++accessSequence;
   const nextOwner=platform.email();
   if(owner!==nextOwner||!platform.token()){
-   job.run++;job.active=false;state.busy=false;job.id='';pendingSubmission=null;clearResult();$('jobStatus').classList.add('hide');$('resumeJob').classList.add('hide');
+   job.run++;job.active=false;state.busy=false;job.id='';pendingSubmission=null;resetProgress();clearResult();$('jobStatus').classList.add('hide');$('resumeJob').classList.add('hide');
   }
   owner=nextOwner;accessAllowed=false;updateUI();
   if(!platform.token()){$('accessMessage').textContent='請登入會員後使用 A2-3 局部重繪。';$('accessAction').textContent='登入會員';return false;}
@@ -286,6 +348,7 @@ window.AiasA23Editor = { async mount(element, platform) {
   if(record.job_id!==id||record.system_id!=='A2-3')throw new Error('unexpected_job');
  }
  async function finishJob(record,id,run){
+  showProgress(4,'生成完成，正在讀取成果','下載完成後，將顯示原圖與最終成果供比對。');
   const images=record.output_images||(record.output_image?[record.output_image]:[]);
   if(!Array.isArray(images)||images.length!==1)throw new Error('missing_final');
   // The authenticated output endpoint indexes this exact job's worker-selected FINAL only.
@@ -297,17 +360,27 @@ window.AiasA23Editor = { async mount(element, platform) {
    try{const original=await request(`/api/a2-3/jobs/${encodeURIComponent(id)}/original`);const sourceBlob=await original.blob();if(run!==job.run)return;job.original=sourceBlob;}catch{/* The authenticated FINAL remains downloadable if original retrieval is temporarily unavailable. */}
   }
   if(run!==job.run)return;
-  const verified=await createImageBitmap(blob);verified.close();
+  const verified=await createImageBitmap(blob),width=verified.width,height=verified.height;verified.close();
+  // Compare this job's authenticated original, never the currently edited canvas.
+  let originalBlob=job.original,canCompare=false;
+  if(originalBlob){
+   try{const original=await createImageBitmap(originalBlob);canCompare=original.width===width&&original.height===height;original.close();}
+   catch{originalBlob=null;}
+  }
   if(run!==job.run)return;
+  job.original=originalBlob;job.canCompare=canCompare;
   job.final=blob;job.finalUrl=URL.createObjectURL(blob);$('finalImage').src=job.finalUrl;
   if(job.original){job.originalUrl=URL.createObjectURL(job.original);$('submittedOriginal').src=job.originalUrl;}
+  if(job.canCompare){$('overlayOriginal').src=job.originalUrl;$('overlayFinal').src=job.finalUrl;$('compareSurface').style.aspectRatio=`${width} / ${height}`;$('compareSurface').style.maxWidth=`min(1100px, calc(min(72vh, 720px) * ${width/height}))`;}
   $('originalFigure').classList.toggle('hide',!job.original);$('comparison').classList.toggle('single',!job.original);
   $('comparison').classList.remove('hide');$('resultControls').classList.remove('hide');$('resultPlaceholder').classList.add('hide');$('resultJobId').textContent=`任務 ${id}`;
-  job.active=false;state.busy=false;forgetJob();jobMessage('生成完成。以下顯示這筆任務的最終成果。');updateUI();
+  setComparisonMode('side');
+  job.active=false;state.busy=false;forgetJob();showProgress(4,'生成完成。以下顯示這筆任務的最終成果。','','complete');updateUI();
   platform.refreshMember().catch(()=>{});
  }
  async function watchJob(id){
   const run=++job.run;job.id=id;job.active=true;state.busy=true;$('resumeJob').classList.add('hide');updateUI();
+  showProgress(progress.startedAt?progress.phase:1,'正在查詢這筆任務','已保留任務編號，無須再次送件。');
   let failures=0;
   while(run===job.run){
    try{
@@ -315,58 +388,61 @@ window.AiasA23Editor = { async mount(element, platform) {
     if(run!==job.run)return;validateJob(record,id);
     if(record.status==='completed'){await finishJob(record,id,run);return;}
     if(record.status==='failed'){
-     job.active=false;state.busy=false;forgetJob();jobMessage(safeError(record),true);updateUI();platform.refreshMember().catch(()=>{});return;
+     job.active=false;state.busy=false;forgetJob();showProgress(progress.phase,safeError(record),'這筆任務已結束，請確認輸入後再試。','error');updateUI();platform.refreshMember().catch(()=>{});return;
     }
     failures=0;
-    const label={pending:'任務已送出，等待處理中。',queued:'任務已送出，等待處理中。',processing:'正在進行局部重繪，請稍候。',finalizing:'正在整理最終成果。'}[record.status]||'任務處理中，請稍候。';
-    jobMessage(label);
+    showRecordProgress(record);
    }catch(error){
     if(run!==job.run)return;
     failures++;
     if(error.status===401||error.status===403||error.status===404||failures>=5){
-     state.busy=false;jobMessage(error.publicMessage||'暫時無法取得這筆任務的狀態。請重新查詢，無須重複送出。',true);$('resumeJob').classList.remove('hide');updateUI();return;
+     const message=[401,403,404].includes(error.status)&&error.publicMessage?error.publicMessage:'暫時無法取得這筆任務的狀態。請重新查詢，無須重複送出。';
+     state.busy=false;showProgress(progress.phase,message,'這不代表任務失敗；請按「重新查詢這筆任務」。','error');$('resumeJob').classList.remove('hide');updateUI();return;
     }
-    jobMessage('連線暫時中斷，正在重新查詢這筆任務。');
+    showProgress(progress.phase,'連線暫時中斷，正在重新查詢這筆任務。','已保留原任務，請勿重複送件。');
    }
    await pause(2500*Math.max(1,failures));
   }
  }
  async function submitJob(){
   if($('submit').disabled)return;
-  const run=++job.run;state.busy=true;updateUI();
+  const run=++job.run;state.busy=true;job.id='';resetProgress();showProgress(0,'正在確認送件權限','收到送件操作，正在準備這筆任務。');updateUI();
   try{
    const allowed=await refreshAccess();
    if(run!==job.run)return;
-   if(!allowed){state.busy=false;updateUI();return;}
+   if(!allowed){state.busy=false;showProgress(0,$('accessMessage').textContent,'尚未送出任務，請確認會員權限。','error');updateUI();return;}
    clearResult();
    job.id='';
+   showProgress(0,'正在準備送件圖片','正在整理原圖、圈選範圍與修改內容。');
    const maskOut=makeCanvas();maskOut.width=state.w;maskOut.height=state.h;
    const mc=maskOut.getContext('2d');mc.fillStyle='#000';mc.fillRect(0,0,state.w,state.h);mc.drawImage(mask,0,0);
    const [original,maskBlob]=await Promise.all([canvasBlob(base),canvasBlob(maskOut)]);maskOut.width=maskOut.height=1;
    if(run!==job.run)return;
-   if(original.size>25*1024*1024||maskBlob.size>25*1024*1024){state.busy=false;toast('轉成 PNG 後超過 25 MB，請使用較小圖片再試。',true);updateUI();return;}
+   if(original.size>25*1024*1024||maskBlob.size>25*1024*1024){state.busy=false;showProgress(0,'轉成 PNG 後超過 25 MB，請使用較小圖片再試。','尚未送出任務。','error');updateUI();return;}
    const prompt=$('prompt').value.trim(),fullAck=$('fullAck').checked;
    const requestKey=await submissionKey(original,maskBlob,prompt,fullAck,run);
    if(run!==job.run)return;
    const form=new FormData();form.append('original_image',original,'original.png');form.append('mask_image',maskBlob,'mask.png');form.append('prompt',prompt);form.append('count','1');form.append('full_mask_ack',String(fullAck));form.append('client_id',platform.clientId());form.append('request_key',requestKey);
-   jobMessage('正在送出原圖、選區與修改內容…');
+   showProgress(0,'正在上傳原圖與選區','送件中，收到任務編號後會自動顯示處理階段。');
    const response=await request('/api/a2-3/jobs',{method:'POST',body:form});const record=await response.json();
    if(run!==job.run)return;
    if(typeof record.job_id!=='string'||!record.job_id||record.system_id!=='A2-3')throw new Error('unexpected_submission');
-   job.original=original;job.id=record.job_id;rememberJob();forgetSubmission();jobMessage('任務已送出，等待處理中。');watchJob(job.id);
-  }catch(error){if(run!==job.run)return;state.busy=false;jobMessage(error.publicMessage||'無法確認任務是否送出，請先到會員任務紀錄確認，避免重複送出。',true);updateUI();}
+   job.original=original;job.id=record.job_id;rememberJob();forgetSubmission();showProgress(1,'任務已送達，等候處理中','已收到這筆任務，請勿重複送件。');watchJob(job.id);
+  }catch(error){if(run!==job.run)return;state.busy=false;showProgress(0,error.publicMessage||'無法確認任務是否送出，請先到會員任務紀錄確認，避免重複送出。','請先確認任務紀錄；重試相同內容可避免重複建立任務。','error');updateUI();}
  }
  async function openJob(id){
   if(typeof id!=='string'||!id)return;
-  if(job.id===id&&job.active)return;
-  job.run++;job.active=false;state.busy=false;clearResult();job.id=id;
-  if(!await refreshAccess())return;
+  if(job.id===id&&job.active&&state.busy)return;
+  const run=++job.run;job.active=false;state.busy=false;resetProgress();clearResult();job.id=id;
+  if(!await refreshAccess()||run!==job.run)return;
   rememberJob();watchJob(id);
  }
  $('accessAction').addEventListener('click',()=>{if(!platform.token())platform.login();else refreshAccess();});
  $('fullAck').addEventListener('change',updateUI);$('submit').addEventListener('click',submitJob);
  $('resumeJob').addEventListener('click',async()=>{if(!job.id)return;if(await refreshAccess())watchJob(job.id);});
  $('downloadFinal').addEventListener('click',()=>{if(job.final)saveBlob(job.final,`A2-3-${job.id}-FINAL.png`);});
+ $('compareToggle').addEventListener('click',()=>setComparisonMode(comparisonMode==='side'?'overlay':'side'));
+ $('compareSlider').addEventListener('input',setComparisonPosition);
  window.addEventListener('storage',()=>{if(platform.email()!==owner||!platform.token())refreshAccess();});
  window.addEventListener('beforeunload',event=>{if(state.busy&&!job.id){event.preventDefault();event.returnValue='';}});
  updateUI();resize();
