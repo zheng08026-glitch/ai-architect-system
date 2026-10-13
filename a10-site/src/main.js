@@ -52,7 +52,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   const terrainSampling = terrain => [Number.isFinite(terrain?.nominalResolutionM) && terrain.nominalResolutionM > 0 ? `來源格網 ${spacing(terrain.nominalResolutionM)}m` : '來源解析度待確認', Number.isFinite(terrain?.intermediateSpacingM) && terrain.intermediateSpacingM > 0 ? `中間取樣 ${spacing(terrain.intermediateSpacingM)}m` : '', Number.isFinite(terrain?.meshSpacingM) && terrain.meshSpacingM > 0 ? `建模網格 ${spacing(terrain.meshSpacingM)}m` : ''].filter(Boolean).join('；');
   const localWorkerEnabled = () => !!(config?.experimentalLocalWorker?.enabled && config?.experimentalLocalWorker?.configured && config?.capabilities?.jobs && config?.capabilities?.skp);
   let editedRangeKind = 'size';
-  const generationLimits = () => localWorkerEnabled() ? config.experimentalLocalWorker.limits : null;
+  const generationLimits = () => config?.experimentalLocalWorker?.limits || null;
   function generationRangeError(bounds, draft = false) {
     const limits = generationLimits();
     if (!limits) return '';
@@ -410,7 +410,8 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     const url = artifactUrl(type); if (!url) return;
     let downloadUrl=url;
     try { if(adapters.downloads.fetch)downloadUrl=URL.createObjectURL(await adapters.downloads.fetch(jobFlow.job.id,type)); }
-    catch(error){status('job-status',error.message,'error');return;}
+    catch(error){if(!state.destroyed)status('job-status',error.message,'error');return;}
+    if(state.destroyed || root.inert){if(downloadUrl.startsWith('blob:'))URL.revokeObjectURL(downloadUrl);return;}
     const anchor = document.createElement('a'); anchor.href = downloadUrl; anchor.download = jobFlow.manifest.artifacts[type].filename || '';
     if(downloadUrl.startsWith('blob:'))setTimeout(()=>URL.revokeObjectURL(downloadUrl),60000);
     root.append(anchor); anchor.click(); anchor.remove();
@@ -532,6 +533,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   });
   listen($('retry-map'), 'click', () => { if (state.provider === 'google' && googleFailure) changeProvider('google'); else map?.retry(); }); update();
   return {
+    refreshConfiguration: () => update(),
     getRequest: () => buildRequest(state),
     getState: () => structuredClone({ mode: state.mode, provider: state.provider, basemap: state.basemap, bounds: state.bounds, selection: state.selection, confirmedAt: state.confirmedAt }),
     destroy() { state.destroyed = true; clearTimeout(jobFlow.timer); requestController?.abort(); listeners.forEach(remove => remove()); removeGoogleError?.(); googleServices?.dispose(); map?.destroy(); },

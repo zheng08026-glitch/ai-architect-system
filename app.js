@@ -319,16 +319,44 @@ const sidebarGroups = [
 gridSystems.push({...systems.find((system) => system.id === "A10_V1"), targetId:"A10_V1", gridDisplayId: "A10", title: "2D TO 3D"});
 systems.push({...legacyA10,id:"A10_SITE",status:"Live System",subtitle:"基地模型・SKP 2019",displayId:"A10-Site",title:"A10-Site",activeTitle:"A10-Site｜基地模型",desc:"框選基地，生成地形、街廓與建築示意模型。",tier:"全功能開通",result:"site"});
 sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF／基地 → SketchUp",childIds:["A10_V1","A10_SITE"]});
-window.addEventListener("message", event => {
-  const frame=document.querySelector("#a10-site-frame");
-  if(event.origin!==location.origin || event.source!==frame?.contentWindow || event.data?.type!=="a10-site-ready")return;
-  frame.contentWindow.postMessage({type:"a10-site-context",apiBase:getApiBase(),token:getAuthToken()||""},location.origin);
-});
+
 if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
 
 let activeId = a23LocalTest ? "A2-3" : "A1-1";
 let expandedSidebarGroup = a23LocalTest ? "A2" : null;
 let a23EditorPromise = null;
+let siteEditorPromise = null;
+
+function renderSiteEditor(system) {
+  const panel = document.querySelector('.tool-panel');
+  const active = system.id === 'A10_SITE';
+  panel.classList.toggle('site-active', active);
+  let host = document.getElementById('a10SiteHost');
+  if (!active) { if (host) host.hidden = true; return; }
+  if (host) {
+    host.hidden = false;
+    siteEditorPromise?.then(editor => editor?.refreshAccess());
+    return;
+  }
+  host = document.createElement('div'); host.id = 'a10SiteHost'; panel.append(host);
+  host.textContent = '正在載入 A10-Site 工作區…';
+  siteEditorPromise = import('./a10-site/src/embedded.js?v=20261014-embed1').then(async editor => {
+    host.textContent = '';
+    return editor.mount(host, {
+      apiBase: getApiBase, token: getAuthToken, email: getAuthEmail,
+      refreshMember: loadMemberCenter,
+      login: () => { authMessage.textContent = '請登入會員後使用 A10-Site。'; authDialog.showModal(); },
+    });
+  }).catch(() => {
+    host.remove();
+    const error = document.createElement('div'); error.id = 'a10SiteHost';
+    error.innerHTML = '<p>A10-Site 工作區載入失敗，請重試。</p><button type="button" class="text-button">重新載入工作區</button>';
+    error.hidden = activeId !== 'A10_SITE'; panel.append(error);
+    error.querySelector('button').onclick = () => { error.remove(); siteEditorPromise = null; renderSiteEditor(getActiveSystem()); };
+    return null;
+  });
+}
+
 
 function renderA23Editor(system) {
   const active = system.id === "A2-3";
@@ -1037,8 +1065,7 @@ async function loadMemberCenter() {
       fetchMemberJson("/api/member/jobs"),
     ]);
     currentMember = profileData || null;
-    const siteFrame=document.querySelector('#a10-site-frame');
-    if(siteFrame)siteFrame.src=siteFrame.src;
+    siteEditorPromise?.then(editor => editor?.refreshAccess());
     setAdminVisible(hasAdminAccess(profileData));
     renderProfile(profileData?.profile || {});
     renderMemberSummary(profileData || {}, usageData || {});
@@ -1055,6 +1082,7 @@ function updateAuthUi() {
   if (!email) setAdminVisible(false);
   setMemberCenterVisible(Boolean(email));
   a23EditorPromise?.then(editor => editor?.refreshAccess());
+  siteEditorPromise?.then(editor => editor?.refreshAccess());
   if (authMessage) {
     authMessage.textContent = email
       ? `已登入：${email}`
@@ -2115,10 +2143,6 @@ function toggleHowToUse() {
 }
 
 function renderInputs(system) {
-  if(system.id === "A10_SITE") {
-    inputStack.innerHTML='<div class="a10-model-card"><strong>A10-Site 基地模型</strong><p>範圍上限 2000 × 2000 公尺。與 A10-V1 共用建模主機，依送出時間排隊。</p><p>本功能使用需管理員開通</p></div>';
-    return;
-  }
   if(system.id === "A10") {
     inputStack.classList.remove("multi-image-inputs");
     inputStack.innerHTML = '<p class="generation-notice">A10-Bata 已停止接受新任務。此頁僅供查看與下載既有成果。</p><button type="button" class="text-button" data-open-a10-v1>前往 A10-v1</button>';
@@ -2181,14 +2205,6 @@ function renderResult(system) {
   renderOutput.classList.toggle("hidden", isPrompt);
   $("#copyResult").hidden = ["A10","A10_V1"].includes(system.id);
 
-  if(system.id === "A10_SITE") {
-    resultTitle.textContent="A10-Site 基地模型";
-    $("#copyResult").hidden=true;
-    downloadButton.disabled=true;
-    mainPreview.innerHTML='<div class="a10-model-card"><h3>A10-Site 基地模型工作台</h3><p>在完整地圖工作台選取範圍、設定地形與街廓，再加入 A10 共同佇列。</p><a class="primary-button" href="./a10-site/index.html">開啟 A10-Site 工作台 →</a><p>沿用本站登入。未開通帳號可查看畫面，需由管理員開通才能操作。</p></div>';
-    thumbGrid.innerHTML="";
-    return;
-  }
   if (["A10","A10_V1"].includes(system.id)) {
     resultTitle.textContent = "SketchUp 模型";
     mainPreview.innerHTML = system.id === "A10"
@@ -2718,7 +2734,8 @@ function renderApp() {
   activeStatus.classList.toggle("pending", system.status !== "Live System");
 
   renderA23Editor(system);
-  if (system.id === "A2-3") { renderHowToUse(system); return; }
+  renderSiteEditor(system);
+  if (["A2-3", "A10_SITE"].includes(system.id)) { renderHowToUse(system); return; }
   renderInputs(system);
   renderResult(system);
   renderHowToUse(system);

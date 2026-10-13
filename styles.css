@@ -715,7 +715,9 @@ section {
   margin: 0;
 }
 
-.tool-panel.a23-active > .tool-body { display: none; }
+.tool-panel.a23-active > .tool-body, .tool-panel.site-active > .tool-body { display: none; }
+#a10SiteHost[hidden] { display: none; }
+#a10SiteHost { min-width: 0; }
 #a23EditorHost[hidden] { display: none; }
 #a23EditorHost { min-width: 0; }
 
