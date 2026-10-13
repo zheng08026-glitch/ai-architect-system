@@ -7,17 +7,20 @@ let started=false;
 async function start(context){
   if(started)return;started=true;
   const config=structuredClone(publicConfig);
-  let allowed=false,enabled=false;
+  let allowed=false,enabled=false,problem='';
   if(context.token&&context.apiBase){
     try{
       const [access,state]=await Promise.all([fetch(context.apiBase+'/api/a10-site/access',{headers:{Authorization:'Bearer '+context.token}}),fetch(context.apiBase+'/api/a10-site/config')]);
       allowed=access.ok&&(await access.json()).allowed===true;enabled=state.ok&&(await state.json()).enabled===true;
-    }catch{}
+      if(access.status===401)problem='登入驗證已過期，請登出並重新登入。';
+      else if(!access.ok||!state.ok)problem='服務回覆異常，請稍後重試。';
+    }catch{problem='無法連線至工作主機服務，請稍後重試。';}
   }
   config.experimentalLocalWorker.enabled=allowed&&enabled;config.experimentalLocalWorker.configured=allowed&&enabled;
   await mountSiteModel(root,{adapters:remoteAdapters(context,config)});
   root.inert=!(allowed&&enabled);notice.hidden=allowed&&enabled;
   if(allowed&&!enabled)notice.textContent='A10-Site 正在部署驗證，完成後即可使用。';
+  if(problem)notice.textContent=problem;
   if(allowed&&enabled){
     const section=document.createElement('section');section.className='panel';section.style='margin:16px;padding:16px';
     const title=document.createElement('h2');title.textContent='我的 A10-Site 任務';section.append(title);root.prepend(section);
