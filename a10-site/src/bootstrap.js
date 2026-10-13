@@ -1,11 +1,12 @@
 import {mountSiteModel} from './main.js';
 import {remoteAdapters} from './remote-adapters.js';
+import publicConfig from './public-config.js';
 const root=document.getElementById('site-model-root');
 const notice=document.createElement('p');notice.style='padding:16px;background:#fff3cd;margin:0;text-align:center';notice.textContent='本功能使用需管理員開通';root.before(notice);root.inert=true;
 let started=false;
 async function start(context){
   if(started)return;started=true;
-  const config=await(await fetch('./public-config.json')).json();
+  const config=structuredClone(publicConfig);
   let allowed=false,enabled=false;
   if(context.token&&context.apiBase){
     try{
