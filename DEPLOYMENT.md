@@ -158,7 +158,7 @@ A10 群組新增 A10-Site。上限為 2000 × 2000 公尺，預設全平面，�
 
 權限由 UM760 的 `full_access.py` 驗證 Supabase 身分：指定擁有者預設開通，只有該身分可透過 `PATCH /api/admin/members/{email}/full-access` 開關他人的 `full_feature_access`。一般 admin 角色與共用管理密鑰不能開通；既有會員額度不變。未開通者可看到完整畫面，但操作區為 inert，伺服器也拒絕送件及下載。畫面提示「本功能使用需管理員開通」。
 
-`a10_site.py` 提供專用建立、狀態與授權下载端點，成果置於非公開資料夾；前端帶 Bearer 下載成 Blob，不在網址傳遞憑證。 iframe 僅接收同來源、正確父視窗的登入訊息。
+`a10_site.py` 提供專用建立、狀態與授權下载端點，成果置於非公開資料夾；前端帶 Bearer 下載成 Blob，不在網址傳遞憑證。 完整工作台位於同網站 /a10-site/，沿用既有 Supabase 登入並刷新工作階段；未開通者仍可點頁面外側的返回主網站登入連結。
 
 A10-V1 與 A10-Site 使用同一常駐工作程序、同一 SketchUp 2019 工作階段，依送出時間共用 FIFO，每次僅允許一筆 processing/finalizing。不是各自一條可同時執行的佇列。過期的原生建模 lease 不自動重送，避免舊 SketchUp 工作仍在執行時重入。
 

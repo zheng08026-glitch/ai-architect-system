@@ -3,6 +3,8 @@ import {remoteAdapters} from './remote-adapters.js';
 import publicConfig from './public-config.js';
 const root=document.getElementById('site-model-root');
 const notice=document.createElement('p');notice.style='padding:16px;background:#fff3cd;margin:0;text-align:center';notice.textContent='本功能使用需管理員開通';root.before(notice);root.inert=true;
+const navigation=document.createElement('p');navigation.style='margin:0;padding:8px 16px;text-align:center';
+const returnLink=document.createElement('a');returnLink.href='../#workspace';returnLink.textContent='返回主網站／會員登入';navigation.append(returnLink);root.before(navigation);
 let started=false;
 async function start(context){
   if(started)return;started=true;
@@ -26,9 +28,9 @@ async function start(context){
     const title=document.createElement('h2');title.textContent='我的 A10-Site 任務';section.append(title);root.prepend(section);
     const list=document.createElement('div');section.append(list);
     const refresh=document.createElement('button');refresh.textContent='重新整理任務';section.append(refresh);
-    const headers={Authorization:'Bearer '+context.token};
+    const authHeaders=()=>({Authorization:'Bearer '+context.token});
     async function load(){
-      const response=await fetch(context.apiBase+'/api/member/jobs',{headers});
+      const response=await fetch(context.apiBase+'/api/member/jobs',{headers:authHeaders()});
       if(!response.ok){list.textContent='請重新登入後查看任務。';return;}
       const data=await response.json();list.replaceChildren();
       for(const j of (data.jobs||[]).filter(j=>j.system_id==='A10_SITE').slice(0,20)){
@@ -36,7 +38,7 @@ async function start(context){
         if(j.status==='completed')for(const kind of ['skp','report']){
           const button=document.createElement('button');button.textContent=kind==='skp'?'下載 SKP':'下載報告';
           button.onclick=async()=>{button.disabled=true;try{
-            const r=await fetch(context.apiBase+`/api/a10-site/jobs/${encodeURIComponent(j.job_id)}/files/${kind}`,{headers});
+            const r=await fetch(context.apiBase+`/api/a10-site/jobs/${encodeURIComponent(j.job_id)}/files/${kind}`,{headers:authHeaders()});
             if(!r.ok)throw Error('下載失敗，請重新登入或稍後重試');
             const u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=kind==='skp'?'A10-Site.skp':'A10-Site-report.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
           }catch(e){notice.hidden=false;notice.textContent=e.message;}finally{button.disabled=false;}};
@@ -60,5 +62,18 @@ if(parent!==window){
   setTimeout(()=>void start({token:'',apiBase:''}),5000);
 }else{
   // Same website and same existing member session; never put credentials in URLs.
-  void start({token:localStorage.getItem('architect-ai-auth-token')||'',apiBase:window.ARCHITECT_AI_API_BASE||''});
+  const context={token:localStorage.getItem('architect-ai-auth-token')||'',apiBase:window.ARCHITECT_AI_API_BASE||''};
+  async function initialize(){
+    if(window.supabase && window.ARCHITECT_AI_SUPABASE_URL && window.ARCHITECT_AI_SUPABASE_ANON_KEY){
+      const client=window.supabase.createClient(window.ARCHITECT_AI_SUPABASE_URL,window.ARCHITECT_AI_SUPABASE_ANON_KEY);
+      const {data,error}=await client.auth.getSession();
+      if(!error)context.token=data.session?.access_token||'';
+      client.auth.onAuthStateChange((event,session)=>{
+        context.token=session?.access_token||'';
+        if(event==='SIGNED_OUT'){root.inert=true;notice.hidden=false;notice.textContent='本功能使用需管理員開通';}
+      });
+    }
+    await start(context);
+  }
+  void initialize().catch(()=>{notice.textContent='登入服務連線失敗，請返回主網站重新登入。';});
 }
