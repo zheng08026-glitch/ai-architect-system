@@ -317,7 +317,13 @@ const sidebarGroups = [
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
 ];
 gridSystems.push({...systems.find((system) => system.id === "A10_V1"), targetId:"A10_V1", gridDisplayId: "A10", title: "2D TO 3D"});
-sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF → SketchUp",childIds:["A10_V1"]});
+systems.push({...legacyA10,id:"A10_SITE",status:"Live System",subtitle:"基地模型・SKP 2019",displayId:"A10-Site",title:"A10-Site",activeTitle:"A10-Site｜基地模型",desc:"框選基地，生成地形、街廓與建築示意模型。",tier:"全功能開通",result:"site"});
+sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF／基地 → SketchUp",childIds:["A10_V1","A10_SITE"]});
+window.addEventListener("message", event => {
+  const frame=document.querySelector("#a10-site-frame");
+  if(event.origin!==location.origin || event.source!==frame?.contentWindow || event.data?.type!=="a10-site-ready")return;
+  frame.contentWindow.postMessage({type:"a10-site-context",apiBase:getApiBase(),token:getAuthToken()||""},location.origin);
+});
 if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
 
 let activeId = a23LocalTest ? "A2-3" : "A1-1";
@@ -814,6 +820,10 @@ function renderAdminMembers(records = []) {
                 .join("")}
             </select>
           </label>
+          <label>全功能開通
+            <input type="checkbox" data-full-access ${member.full_feature_access ? "checked" : ""} ${!currentMember?.can_manage_full_features || member.email === "zheng08026@gmail.com" ? "disabled" : ""}>
+            <button type="button" class="text-button" data-admin-action="full-access" ${!currentMember?.can_manage_full_features || member.email === "zheng08026@gmail.com" ? "disabled" : ""}>儲存開通設定</button>
+          </label>
           <div class="admin-member-actions">
             <button class="text-button" type="button" data-admin-action="details">Details</button>
             <button class="text-button" type="button" data-admin-action="save">Save</button>
@@ -968,7 +978,9 @@ async function handleAdminMemberAction(event) {
   if (adminMessage) adminMessage.textContent = "Saving admin change...";
 
   try {
-    if (action === "details") {
+    if(action === "full-access") {
+      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/full-access`,{method:"PATCH",body:JSON.stringify({enabled:card.querySelector('[data-full-access]').checked})});
+    } else if (action === "details") {
       await loadAdminMemberDetail(email);
     } else if (action === "save") {
       const payload = {
@@ -1025,6 +1037,8 @@ async function loadMemberCenter() {
       fetchMemberJson("/api/member/jobs"),
     ]);
     currentMember = profileData || null;
+    const siteFrame=document.querySelector('#a10-site-frame');
+    if(siteFrame)siteFrame.src=siteFrame.src;
     setAdminVisible(hasAdminAccess(profileData));
     renderProfile(profileData?.profile || {});
     renderMemberSummary(profileData || {}, usageData || {});
@@ -2101,6 +2115,10 @@ function toggleHowToUse() {
 }
 
 function renderInputs(system) {
+  if(system.id === "A10_SITE") {
+    inputStack.innerHTML='<div class="a10-model-card"><strong>A10-Site 基地模型</strong><p>範圍上限 2000 × 2000 公尺。與 A10-V1 共用建模主機，依送出時間排隊。</p><p>本功能使用需管理員開通</p></div>';
+    return;
+  }
   if(system.id === "A10") {
     inputStack.classList.remove("multi-image-inputs");
     inputStack.innerHTML = '<p class="generation-notice">A10-Bata 已停止接受新任務。此頁僅供查看與下載既有成果。</p><button type="button" class="text-button" data-open-a10-v1>前往 A10-v1</button>';
@@ -2163,6 +2181,14 @@ function renderResult(system) {
   renderOutput.classList.toggle("hidden", isPrompt);
   $("#copyResult").hidden = ["A10","A10_V1"].includes(system.id);
 
+  if(system.id === "A10_SITE") {
+    resultTitle.textContent="A10-Site 基地模型";
+    $("#copyResult").hidden=true;
+    downloadButton.disabled=true;
+    mainPreview.innerHTML='<iframe id="a10-site-frame" src="./a10-site/index.html" title="A10-Site 基地模型" style="width:100%;height:1100px;border:0;background:#f5f7f2"></iframe>';
+    thumbGrid.innerHTML="";
+    return;
+  }
   if (["A10","A10_V1"].includes(system.id)) {
     resultTitle.textContent = "SketchUp 模型";
     mainPreview.innerHTML = system.id === "A10"

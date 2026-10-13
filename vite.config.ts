@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 
 const staticRuntimeFiles = [
   'app.js',
+  'a10-site',
   'a2-3-editor.js',
   'a2-3-editor.html',
   'config.js',
@@ -22,7 +23,7 @@ function copyStaticRuntimeFiles() {
         if (!existsSync(file)) continue
         const target = join('dist', file)
         mkdirSync(dirname(target), { recursive: true })
-        cpSync(file, target)
+        cpSync(file, target, { recursive: true })
       }
 
       if (existsSync('assets/operation-guides')) {
