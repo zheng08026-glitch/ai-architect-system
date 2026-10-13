@@ -2185,7 +2185,7 @@ function renderResult(system) {
     resultTitle.textContent="A10-Site 基地模型";
     $("#copyResult").hidden=true;
     downloadButton.disabled=true;
-    mainPreview.innerHTML='<iframe id="a10-site-frame" src="./a10-site/index.html" title="A10-Site 基地模型" style="width:100%;height:1100px;border:0;background:#f5f7f2"></iframe>';
+    mainPreview.innerHTML='<div class="a10-model-card"><h3>A10-Site 基地模型工作台</h3><p>在完整地圖工作台選取範圍、設定地形與街廓，再加入 A10 共同佇列。</p><a class="primary-button" href="./a10-site/index.html">開啟 A10-Site 工作台 →</a><p>沿用本站登入。未開通帳號可查看畫面，需由管理員開通才能操作。</p></div>';
     thumbGrid.innerHTML="";
     return;
   }

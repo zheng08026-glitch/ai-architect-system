@@ -55,5 +55,10 @@ window.addEventListener('message',event=>{
   if(context.apiBase&&!/^https:\/\//.test(context.apiBase))return;
   void start(context);
 });
-if(parent!==window)parent.postMessage({type:'a10-site-ready'},location.origin);
-setTimeout(()=>void start({token:'',apiBase:''}),5000);
+if(parent!==window){
+  parent.postMessage({type:'a10-site-ready'},location.origin);
+  setTimeout(()=>void start({token:'',apiBase:''}),5000);
+}else{
+  // Same website and same existing member session; never put credentials in URLs.
+  void start({token:localStorage.getItem('architect-ai-auth-token')||'',apiBase:window.ARCHITECT_AI_API_BASE||''});
+}
