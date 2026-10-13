@@ -1,6 +1,6 @@
-import { mountSiteModel } from './main.js';
-import { remoteAdapters } from './remote-adapters.js';
-import publicConfig from './public-config.js';
+import { mountSiteModel } from './main.js?v=20261014-embed2';
+import { remoteAdapters } from './remote-adapters.js?v=20261014-embed2';
+import publicConfig from './public-config.js?v=20261014-embed2';
 
 const asset = path => new URL(path, import.meta.url).href;
 let leafletReady;
@@ -25,7 +25,7 @@ export async function mount(host, platform) {
   template.querySelectorAll('.app-header, .page-title, footer, script').forEach(node => node.remove());
   await loadLeaflet();
   const shadow = host.attachShadow({ mode: 'open' });
-  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css', '../embedded.css'].map(path => new Promise((resolve, reject) => {
+  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261014-embed2', '../embedded.css?v=20261014-embed2'].map(path => new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet'; link.href = asset(path); link.onload = resolve;
     link.onerror = () => reject(Error('工作區樣式載入失敗，請重試。'));
@@ -108,26 +108,35 @@ export async function mount(host, platform) {
     if (history) history.hidden = true;
     accessBar.hidden = false; notice.textContent = '本功能使用需管理員開通';
     login.hidden = Boolean(context.token); retry.hidden = !context.token;
-    let allowed = false, enabled = false;
+    let allowed = false, enabled = false, phase = 'model-mount';
     try {
       if (changed || !root) { ++sessionVersion; await resetModel(); }
       if (version !== checkVersion) return;
       if (context.token && context.apiBase) {
+        phase = 'access-fetch';
         const [access, state] = await Promise.all([
           fetch(context.apiBase + '/api/a10-site/access', { headers: headers() }),
           fetch(context.apiBase + '/api/a10-site/config'),
         ]);
         if (version !== checkVersion) return;
-        if (access.status === 401) { login.hidden = false; throw Error('登入驗證已過期，請重新登入。'); }
-        if (!access.ok || !state.ok) throw Error('服務暫時無法回應，請稍後重試。');
+        phase = 'access-response';
+        if (access.status === 401) { login.hidden = false; throw Object.assign(Error('登入驗證已過期，請重新登入。'), { code: 'SESSION_EXPIRED' }); }
+        if (!access.ok || !state.ok) throw Object.assign(Error('服務暫時無法回應，請稍後重試。'), { code: 'ACCESS_RESPONSE_FAILED' });
+        phase = 'access-json';
         allowed = (await access.json()).allowed === true; enabled = (await state.json()).enabled === true;
       }
+      phase = 'model-ready';
       await modelReady;
       if (version !== checkVersion) return;
       config.experimentalLocalWorker.enabled = allowed && enabled; config.experimentalLocalWorker.configured = allowed && enabled;
-      model?.refreshConfiguration(); root.inert = !(allowed && enabled); accessBar.hidden = allowed && enabled;
+      phase = 'model-refresh';
+      if (typeof model?.refreshConfiguration !== 'function') {
+        throw Object.assign(Error('工作區程式版本不同步，請重新整理頁面。'), { code: 'EDITOR_VERSION_MISMATCH' });
+      }
+      model.refreshConfiguration(); root.inert = !(allowed && enabled); accessBar.hidden = allowed && enabled;
       if (allowed && !enabled) notice.textContent = 'A10-Site 暫停受理新任務，請稍後再試。';
       if (allowed && enabled) {
+        phase = 'history';
         history.hidden = false;
         if (!history.childElementCount) {
           history.innerHTML = '<h2>我的 A10-Site 任務</h2><div data-history-list></div><button type="button" class="secondary">重新整理任務</button>';
@@ -136,7 +145,24 @@ export async function mount(host, platform) {
         await loadHistory();
       }
     } catch (error) {
-      if (version === checkVersion) notice.textContent = error.name === 'TypeError' ? '無法連線至工作主機服務，請稍後重試。' : error.message;
+      if (version !== checkVersion) return;
+      // Keep the editor locked on both network and JavaScript failures.
+      config.experimentalLocalWorker.enabled = false; config.experimentalLocalWorker.configured = false;
+      if (root) root.inert = true;
+      if (history) history.hidden = true;
+      accessBar.hidden = false;
+      const publicMessages = {
+        SESSION_EXPIRED: '登入驗證已過期，請重新登入。',
+        ACCESS_RESPONSE_FAILED: '服務暫時無法回應，請稍後重試。',
+        EDITOR_VERSION_MISMATCH: '工作區程式版本不同步，請重新整理頁面。',
+      };
+      const code = Object.hasOwn(publicMessages, error?.code) ? error.code : 'EDITOR_REFRESH_FAILED';
+      // Only static phase/type/code diagnostics: never tokens, API payloads or account data.
+      console.warn('[A10-Site] Editor refresh failed', { phase, errorType: error?.name || 'Error', code });
+      notice.textContent = publicMessages[code]
+        || (phase === 'access-fetch' && error?.name === 'TypeError'
+          ? '無法連線至工作主機服務，請稍後重試。'
+          : '工作區載入失敗，請重新整理頁面；若仍持續發生，請聯絡管理員。');
     }
   }
   retry.onclick = refreshAccess;

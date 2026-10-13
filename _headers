@@ -25,3 +25,9 @@
 
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# Mutable A10-Site editor modules must not retain mixed deployment versions.
+/a10-site/*
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
