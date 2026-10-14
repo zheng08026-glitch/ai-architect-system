@@ -1,6 +1,6 @@
-import { mountSiteModel } from './main.js?v=20261014-embed2';
-import { remoteAdapters } from './remote-adapters.js?v=20261014-embed2';
-import publicConfig from './public-config.js?v=20261014-embed2';
+import { mountSiteModel } from './main.js?v=20261015-launch';
+import { remoteAdapters } from './remote-adapters.js?v=20261015-launch';
+import publicConfig from './public-config.js?v=20261015-launch';
 
 const asset = path => new URL(path, import.meta.url).href;
 let leafletReady;
@@ -25,7 +25,7 @@ export async function mount(host, platform) {
   template.querySelectorAll('.app-header, .page-title, footer, script').forEach(node => node.remove());
   await loadLeaflet();
   const shadow = host.attachShadow({ mode: 'open' });
-  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261014-embed2', '../embedded.css?v=20261014-embed2'].map(path => new Promise((resolve, reject) => {
+  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261015-launch', '../embedded.css?v=20261015-launch'].map(path => new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet'; link.href = asset(path); link.onload = resolve;
     link.onerror = () => reject(Error('工作區樣式載入失敗，請重試。'));
@@ -161,7 +161,7 @@ export async function mount(host, platform) {
       console.warn('[A10-Site] Editor refresh failed', { phase, errorType: error?.name || 'Error', code });
       notice.textContent = publicMessages[code]
         || (phase === 'access-fetch' && error?.name === 'TypeError'
-          ? '無法連線至工作主機服務，請稍後重試。'
+          ? '無法連線至建模服務，請稍後重試。'
           : '工作區載入失敗，請重新整理頁面；若仍持續發生，請聯絡管理員。');
     }
   }

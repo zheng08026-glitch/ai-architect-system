@@ -89,7 +89,7 @@ export function createGoogleServices({ googleConfig = {}, windowRef = globalThis
   };
   const ownAuthFailure = () => {
     if (disposed) return;
-    const error = serviceError('GOOGLE_AUTH_FAILURE', 'Google Maps 授權失敗，請由管理者檢查金鑰、API、網站限制與計費設定；此原型不會替您啟用費用。');
+    const error = serviceError('GOOGLE_AUTH_FAILURE', 'Google Maps 授權失敗，請由管理者檢查金鑰、API、網站限制與計費設定；本功能不會替您啟用費用。');
     authFailure = error; canReuseHostMaps = false; loadPromise = null;
     if (loadAttempt) loadAttempt.finish(error);
     else { removeScript(); emitError(error); }

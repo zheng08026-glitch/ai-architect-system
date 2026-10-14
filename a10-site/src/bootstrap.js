@@ -16,7 +16,7 @@ async function start(context){
       allowed=access.ok&&(await access.json()).allowed===true;enabled=state.ok&&(await state.json()).enabled===true;
       if(access.status===401)problem='登入驗證已過期，請登出並重新登入。';
       else if(!access.ok||!state.ok)problem='服務回覆異常，請稍後重試。';
-    }catch{problem='無法連線至工作主機服務，請稍後重試。';}
+    }catch{problem='無法連線至建模服務，請稍後重試。';}
   }
   config.experimentalLocalWorker.enabled=allowed&&enabled;config.experimentalLocalWorker.configured=allowed&&enabled;
   await mountSiteModel(root,{adapters:remoteAdapters(context,config)});

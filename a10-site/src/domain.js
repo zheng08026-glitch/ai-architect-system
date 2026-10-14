@@ -40,7 +40,7 @@ function structureErrors(bounds) {
     errors.push('經度必須介於 -180 與 180 度之間。');
   }
   if (Math.abs(bounds.south) > LIMITS.maximumLatitude || Math.abs(bounds.north) > LIMITS.maximumLatitude) {
-    errors.push('此原型支援的緯度範圍為 -85 至 85 度。');
+    errors.push('本功能支援的緯度範圍為 -85 至 85 度。');
   }
   if (bounds.south >= bounds.north) errors.push('南北範圍必須大於零，且 south 小於 north。');
   if (bounds.west >= bounds.east) errors.push('東西範圍必須大於零；不支援跨越國際換日線。');
@@ -141,7 +141,7 @@ export function buildRequest({ bounds, selection, confirmedAt, missingHeightPoli
     throw new TypeError('必須先確認範圍，並提供有效的 confirmedAt 日期字串。');
   }
   if (missingHeightPolicy !== 'omit-and-report') {
-    throw new RangeError('此原型僅支援缺少樓高時略過並列入報告，不可臆造樓高。');
+    throw new RangeError('本功能僅支援缺少樓高時略過並列入報告，不可臆造樓高。');
   }
   const metrics = measureBounds(bounds);
   const { west, south, east, north } = bounds;

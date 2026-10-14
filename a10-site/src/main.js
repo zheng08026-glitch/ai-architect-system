@@ -88,7 +88,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     const year = coverage?.terrain?.sourceYear || coverage?.actual?.terrainSourceYear;
     const dates = coverage?.terrain?.sourceDates || coverage?.actual?.terrainSourceDates;
     if (year) { const item = document.createElement('li'); item.textContent = `本次地形來源：${coverage.terrain?.sourceTitle ? `${coverage.terrain.sourceTitle}；` : ''}${year} 年${Array.isArray(dates) && dates.length ? `（來源日期 ${dates.join('、')}）` : ''}；${terrainSampling(coverage.terrain)} 歷史資料${coverage.terrain?.verticalDatum ? `；高程基準 ${coverage.terrain.verticalDatum}` : ''}，非現況實測。`; $('job-gaps').append(item); }
-    $('job-coverage-label').textContent = coverage ? '資料限制（實際來源與缺漏請以成果報告為準）' : '工作主機測試會先檢查範圍與已知資料限制。';
+    $('job-coverage-label').textContent = coverage ? '資料限制（實際來源與缺漏請以成果報告為準）' : '送出前會先檢查範圍與已知資料限制。';
   }
   function updateJob(ready) {
     const enabled = localWorkerEnabled();
@@ -113,7 +113,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       const buildingsDescription = `${textValue(dataset.buildings?.sourceTitle)} 高度依來源欄位；仍需現況核對，缺高不補造`;
       const roadsDescription = dataset.roads?.representation === 'centerlines-only' ? '道路僅中心線' : '道路資料依來源標示，未核驗實際邊界';
       $('model-source-description').textContent = `${textValue(dataset.title)}。建物：${buildingsDescription}。地形：${terrainDescription}，非現況實測。${roadsDescription}。`;
-      $('partial-consent-description').textContent = `同意先產生部分成果：${buildingsDescription}；${roadsDescription}；地形為 ${terrainDescription} 歷史資料，並非現況實測。影像僅在來源授權與驗證通過後提供，否則不含影像；並非完整基地模。`;
+      $('partial-consent-description').textContent = `同意先產生部分成果：${buildingsDescription}；${roadsDescription}；地形為 ${terrainDescription} 歷史資料，並非現況實測。影像僅在來源授權與驗證通過後提供，否則不含影像；並非完整基地模型。`;
     } else {
       $('model-source-description').textContent = defaultSourceDescription;
       $('partial-consent-description').textContent = defaultPartialDescription;
@@ -127,11 +127,11 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     const contextText=state.siteOptions.contextMode==='schematic'?'道路寬度與街廓為示意；捷運路線不代表高架或地下高程。':'道路僅中心線。';
     $('model-source-description').textContent=heightText+terrainText+contextText;
     $('partial-consent-description').textContent='同意產生部分成果：'+heightText+terrainText+contextText+(state.siteOptions.aerialMode==='private-photo2'?'官方航照僅內嵌私人模型，原始標示保留；取得失敗會列入缺漏。':'未選擇官方航照內嵌。');
-    $('worker-state').textContent = enabled ? '工作主機 SketchUp Desktop 實驗流程' : '工作主機生成尚未啟用';
+    $('worker-state').textContent = enabled ? '建模服務可用' : '建模服務未啟用';
     $('accept-partial').disabled = !enabled || !confirmed || busy;
     $('generate-skp').disabled = !enabled || !confirmed || !$('accept-partial').checked || busy || complete;
-    $('generate-skp').textContent = jobFlow.submitting ? '檢查與送出中…' : activeJob() ? '工作主機任務處理中…' : complete ? '此範圍已有成果' : '產生工作主機部分成果 SKP';
-    $('generate-skp').title = enabled ? '由公司工作主機執行；航照須獨立授權並通過驗證' : '需先啟用工作主機實驗工作程序';
+    $('generate-skp').textContent = jobFlow.submitting ? '檢查與送出中…' : activeJob() ? '建模中…' : complete ? '此範圍已有成果' : '產生基地模型 SKP';
+    $('generate-skp').title = enabled ? '由 AIAS 建模服務執行；航照須通過來源授權與影像驗證' : '本功能使用需管理員開通';
     $('download-skp').disabled = !confirmed || !current || !artifactUrl('model');
     $('download-report').disabled = !confirmed || !current || !artifactUrl('report');
     $('download-skp').textContent = artifactUrl('model') && current ? '下載已驗證的部分成果 SKP' : '下載 SKP · 尚無已驗證檔案';
@@ -141,7 +141,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('aerial-date').textContent = aerialMetadata ? textValue(aerialMetadata.acquisitionDate) : '未知 · 待來源提供';
     $('aerial-resolution').textContent = aerialMetadata && Number.isFinite(aerialMetadata.nominalResolutionM) && aerialMetadata.nominalResolutionM > 0 ? `${aerialMetadata.nominalResolutionM} m/pixel（來源標稱）；列印比例尺依輸出尺寸` : '未知 · 待來源解析度';
     $('aerial-source').textContent = aerialMetadata ? `${textValue(aerialMetadata.sourceTitle)}；${textValue(aerialMetadata.attribution)}；授權：${textValue(aerialMetadata.licenseId)}（${textValue(aerialMetadata.licenseUrl)}）` : syntheticAerial ? '合成測試影像，非真實航照，不提供航照下載' : '尚無已驗證授權航照';
-    $('model-aerial-note').textContent = aerialAvailable ? `已有同範圍授權${imageryLabel}可下載；樓高等限制仍使本模型屬部分成果。僅限工作主機已授權 SketchUp Desktop。` : '尚無已驗證航照；不是完整基地模。僅限工作主機已授權 SketchUp Desktop。';
+    $('model-aerial-note').textContent = aerialAvailable ? `已有同範圍授權${imageryLabel}可下載；樓高等限制仍使本模型屬部分成果。` : '尚無已驗證航照；不是完整基地模型。';
     if(state.siteOptions.aerialMode==='private-photo2') $('model-aerial-note').textContent = jobFlow.job?.coverage?.privateAerialEmbedded && current ? '官方航照已內嵌 SKP，原生重開驗證通過；不提供獨立影像下載。' : '生成時取得框選範圍的一張官方航照，並驗證內嵌；尚未完成前不宣稱已有貼圖。';
     const displayNotice = state.provider!=='google'&&state.basemap==='nlsc-aerial'
       ? '國土測繪中心航照已接入顯示，可定位與框選；模型是否內嵌航照，依本次輸出選項與驗證結果。'
@@ -173,9 +173,9 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       const job = await adapters.jobs.get(id);
       if (state.destroyed || id !== jobFlow.job?.id) return;
       jobFlow.job = job; jobFlow.coverage = job.coverage || jobFlow.coverage; showCoverage(jobFlow.coverage);
-      const messages = { queued: '任務已排隊，等待工作主機工作程序。', running: '正在處理工作主機資料與 SketchUp 模型；可保留此頁等候。', partial: '已產生部分成果，正在核對可下載檔案；樓高與地形等限制請查看成果報告。', succeeded: '工作程序已完成；只開放已驗證的實際檔案下載。', failed: `任務失敗：${job.error?.message || job.error?.code || '請查看工作主機工作程序紀錄後重試。'}` };
+      const messages = { queued: '任務已排隊，等待建模服務處理。', running: '正在取得資料並建立 SketchUp 模型；可保留此頁等候。', partial: '已產生部分成果，正在核對可下載檔案；樓高與地形等限制請查看成果報告。', succeeded: '建模已完成；只開放已驗證的實際檔案下載。', failed: `任務失敗：${job.error?.message || job.error?.code || '請稍後重試，或聯繫管理員。'}` };
       status('job-status', messages[job.status] || '正在讀取任務狀態。', job.status === 'failed' ? 'error' : job.status === 'partial' ? 'warning' : '');
-      $('job-stage').textContent = job.queue_position ? `共同佇列：第 ${job.queue_position} 位（A10-V1／A10-Site）` : job.stage ? `目前階段：${({ queued: '排隊', fetching: '取得資料', 'fetching-data': '取得資料', processing: '整理幾何', sketchup: 'SketchUp 建模與驗證', validating: '驗證檔案', completed: '完成', failed: '失敗' })[job.stage] || '工作主機工作處理中'}` : '';
+      $('job-stage').textContent = job.queue_position ? `共同佇列：第 ${job.queue_position} 位（A10-V1／A10-Site）` : job.stage ? `目前階段：${({ queued: '排隊', fetching: '取得資料', 'fetching-data': '取得資料', processing: '整理幾何', sketchup: 'SketchUp 建模與驗證', validating: '驗證檔案', completed: '完成', failed: '失敗' })[job.stage] || '建模處理中'}` : '';
       if (['partial', 'succeeded'].includes(job.status)) {
         jobFlow.manifest = await adapters.downloads.get(id);
         if (state.destroyed || id !== jobFlow.job?.id) return;
@@ -185,7 +185,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       root.dispatchEvent(new CustomEvent('aias:job-updated', { bubbles: true, detail: structuredClone(job) }));
       if (activeJob()) jobFlow.timer = setTimeout(pollJob, 2000);
     } catch (error) {
-      if (!state.destroyed) status('job-status', `無法取得任務狀態：${error.message || '請恢復連線後按重新整理。'} 任務可能仍在工作主機執行，請勿重複送出。`, 'error');
+      if (!state.destroyed) status('job-status', `無法取得任務狀態：${error.message || '請恢復連線後按重新整理。'} 任務可能仍在處理中，請勿重複送出。`, 'error');
     } finally { jobFlow.polling = false; update(); }
   }
   const update = () => {
@@ -388,21 +388,21 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     }
     request.coverage = { ...request.coverage, acceptPartial: true, acceptedAt: new Date().toISOString(), acceptedLimitations: config?.experimentalLocalWorker?.dataset?.id ? ['source-height-requires-current-verification', 'missing-heights-not-invented', 'road-boundaries-unverified', 'historical-terrain-source-resolution', 'unverified-aerial-omitted'] : ['unverified-osm-height', 'missing-heights-not-invented', 'roads-centerlines-only', 'terrain-20m-coarse', 'unverified-aerial-omitted'] };
     jobFlow.submitting = true; jobFlow.manifest = null;
-    status('job-status', '正在檢查範圍與工作主機資料限制…'); update();
+    status('job-status', '正在檢查範圍與資料限制…'); update();
     try {
       const coverage = await adapters.coverage.check({ request });
       if (state.destroyed) return;
       jobFlow.coverage = coverage; showCoverage(coverage);
       if (!state.confirmedAt || state.pendingEdits || state.drawing || googleDerived() || !sameBounds(state.bounds, request.bounds) || state.terrainMode !== request.requestedOutputs.terrainMode || JSON.stringify(state.siteOptions)!==JSON.stringify(request.requestedOutputs.siteOptions) || !$('accept-partial').checked) throw new Error('範圍或同意狀態已改變；請重新確認後再送出。');
-      if (!['partial', 'available', 'ready', 'complete'].includes(coverage.status)) throw new Error('此範圍目前無法開始工作主機生成。');
-      status('job-status', '已確認部分成果限制，正在送出工作主機任務…');
+      if (!['partial', 'available', 'ready', 'complete'].includes(coverage.status)) throw new Error('此範圍目前無法開始建模。');
+      status('job-status', '已確認部分成果限制，正在送出建模任務…');
       const job = await adapters.jobs.create({ request, acceptPartial: true, idempotencyKey: jobFlow.idempotencyKey });
       if (state.destroyed) return;
-      if (!job.id || !['queued', 'running', 'partial', 'succeeded', 'failed'].includes(job.status)) throw new Error('工作程序回傳的任務資料不完整。');
+      if (!job.id || !['queued', 'running', 'partial', 'succeeded', 'failed'].includes(job.status)) throw new Error('建模服務回傳的任務資料不完整。');
       jobFlow.job = job; jobFlow.requestBounds = structuredClone(request.bounds);
       status('job-status', '任務已建立，正在讀取狀態。');
       await pollJob();
-    } catch (error) { if (!state.destroyed) status('job-status', `無法開始工作主機任務：${error.message || '請檢查連線後重試。'}`, 'error'); }
+    } catch (error) { if (!state.destroyed) status('job-status', `無法開始建模任務：${error.message || '請檢查連線後重試。'}`, 'error'); }
     finally { jobFlow.submitting = false; update(); }
   });
   for (const [id, type] of [['download-skp', 'model'], ['download-report', 'report'], ['download-aerial', 'aerial']]) listen($(id), 'click', async () => {
