@@ -14,7 +14,7 @@
     <meta property="og:image" content="./assets/hero-system.png" />
     <meta name="theme-color" content="#050711" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=a10-site-embedded-20261014-r2" />
+    <link rel="stylesheet" href="./styles.css?v=admin-monitor-20261014-r1" />
   </head>
   <body>
     <div class="site-shell">
@@ -504,9 +504,12 @@
       </form>
       <div>
         <p class="eyebrow"><span></span> Admin Console</p>
-        <h2>Member Operations</h2>
+        <h2>系統監控與會員管理</h2>
         <p class="auth-note" id="adminMessage">Manage members, usage grants, plans, and account status.</p>
 
+        <section id="adminMonitor" class="admin-monitor" aria-label="主機與排單監控"><p>開啟後台後載入主機狀態。</p></section>
+
+        <h3 class="admin-members-heading">會員管理</h3>
         <div class="admin-overview" id="adminOverview">
           <span>Loading overview...</span>
         </div>
@@ -535,6 +538,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=member-usage-20260604"></script>
     <script src="./a2-3-editor.js?v=a23-progress-compare-20261012-r2"></script>
-    <script src="./app.js?v=a10-site-embedded-20261014-r2"></script>
+    <script src="./app.js?v=admin-monitor-20261014-r1"></script>
   </body>
 </html>

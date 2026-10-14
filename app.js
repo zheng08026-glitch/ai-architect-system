@@ -1067,6 +1067,7 @@ async function loadMemberCenter() {
     currentMember = profileData || null;
     siteEditorPromise?.then(editor => editor?.refreshAccess());
     setAdminVisible(hasAdminAccess(profileData));
+    if (adminDialog?.open) void startAdminMonitor();
     renderProfile(profileData?.profile || {});
     renderMemberSummary(profileData || {}, usageData || {});
     renderUsageList(usageData?.usage || []);
@@ -1077,6 +1078,7 @@ async function loadMemberCenter() {
 }
 
 function updateAuthUi() {
+  adminMonitor?.checkAccess();
   const email = getAuthEmail();
   if (authButton) authButton.textContent = email ? "會員中心" : "登入";
   if (!email) setAdminVisible(false);
@@ -3309,6 +3311,8 @@ async function loginWithGoogle() {
 }
 
 async function signOut() {
+  adminMonitor?.stop('unauthorized');
+  if (adminDialog?.open) adminDialog.close();
   resetA10View();
   const client = getSupabaseClient();
   if (client) await client.auth.signOut();
@@ -3373,14 +3377,44 @@ document.addEventListener("keydown", (event) => {
   isHowToUseOpen = false;
   renderHowToUse(getActiveSystem());
 });
+let adminMonitor, adminMonitorPromise;
+async function startAdminMonitor() {
+  const host = document.getElementById('adminMonitor');
+  if (!host || !adminDialog?.open || document.hidden) return;
+  try {
+    if (!adminMonitorPromise) {
+      adminMonitorPromise = import('./admin-monitor.js?v=20261014-monitor1').then(module => {
+        adminMonitor = module.mountMonitor(host, {
+          dialog: adminDialog,
+          readContext: () => ({
+            allowed: hasAdminAccess(currentMember) && Boolean(getAuthToken())
+              && String(currentMember?.email || '').toLowerCase() === String(getAuthEmail() || '').toLowerCase(),
+            token: getAuthToken(), identity: getAuthEmail(), base: getApiBase(),
+          }),
+        });
+        return adminMonitor;
+      }).catch(error => { adminMonitorPromise = null; throw error; });
+    }
+    const monitor = await adminMonitorPromise;
+    if (adminDialog.open && !document.hidden) await monitor.start();
+  } catch {
+    host.textContent = '主機監控載入失敗，請重新整理頁面。會員管理仍可使用。';
+  }
+}
+
 async function openAdminDialog() {
   adminDialog?.showModal();
+  void startAdminMonitor();
   await loadAdminDashboard();
 }
 
 adminButton?.addEventListener("click", openAdminDialog);
 memberAdminButton?.addEventListener("click", openAdminDialog);
-adminRefresh?.addEventListener("click", loadAdminDashboard);
+adminRefresh?.addEventListener("click", () => {
+  void loadAdminDashboard();
+  if (adminMonitor) void adminMonitor.refresh(); else void startAdminMonitor();
+});
+adminDialog?.addEventListener('close', () => adminMonitor?.stop());
 adminMemberList?.addEventListener("click", handleAdminMemberAction);
 adminDetailClose?.addEventListener("click", () => {
   if (adminDetail) adminDetail.hidden = true;

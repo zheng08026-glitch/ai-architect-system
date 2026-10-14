@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:monitor": "node --test tests/admin-monitor.test.mjs",
     "test:a10": "node --check app.js && node tests/a10-status.test.mjs",
     "dev": "vite",
-    "build": "npm run test:a10 && tsc -b && vite build",
+    "build": "npm run test:a10 && npm run test:monitor && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
