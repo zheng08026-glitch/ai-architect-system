@@ -153,6 +153,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       $('aerial-disclosure').textContent='官方航照貼圖已通過原生存檔與重開驗證；拍攝日期與來源解析度未知，不填造。'+displayNotice;
     }
     $('job-state').textContent = ({ queued: '排隊中', running: '產生中', partial: '部分成果', succeeded: '完成', failed: '失敗' })[jobFlow.job?.status] || (jobFlow.submitting ? '送出中' : '尚未送出');
+    renderProgress();
     $('refresh-job').hidden = !jobFlow.job;
     $('refresh-job').disabled = jobFlow.polling || jobFlow.submitting;
     if (jobFlow.job) {
@@ -165,6 +166,29 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     if (complete && jobFlow.job?.coverage?.privateAerialEmbedded) $('export-state').textContent='部分 SKP 已含航照貼圖；請一併閱讀成果報告';
     else if (confirmed && !complete) $('export-state').textContent = '已確認範圍；請確認部分成果限制後送出';
   }
+  // Stage reported by the worker → [label, fallback %, step index (0 排隊 … 4 回傳成果, 5 = all done)]
+  const SITE_STAGES = { queued: ['排隊中', 0, 0], leased: ['準備資料', 5, 1], preparing: ['準備資料', 5, 1],
+    'checking-local-desktop': ['準備資料', 8, 1], 'checking-terrain-coverage': ['準備資料', 8, 1], 'preparing-private-aerial': ['取得官方航照', 15, 1],
+    'fetching-osm': ['取得建物與道路資料', 30, 1], 'fetching-data': ['取得資料', 20, 1], 'building-geometry': ['建立量體與街廓', 45, 2],
+    modeling: ['SketchUp 建模中', 55, 3], 'exporting-and-reopening-skp': ['SketchUp 建模與驗證', 65, 3], 'partial-result-verified': ['模型驗證完成', 90, 4],
+    uploading: ['回傳成果', 95, 4], completed: ['完成', 100, 5] };
+  function renderProgress() {
+    const job = jobFlow.job, box = $('site-progress');
+    if (!job || job.status === 'failed') { box.hidden = true; return; }
+    const done = ['partial', 'succeeded'].includes(job.status);
+    const [label, fallback, step] = done ? SITE_STAGES.completed : SITE_STAGES[job.stage] || (job.status === 'queued' ? SITE_STAGES.queued : ['建模處理中', 50, 3]);
+    const reported = Number(job.progress_percent);
+    const percent = done ? 100 : Math.max(0, Math.min(99, reported > 0 ? Math.max(reported, fallback) : fallback));
+    const started = Number(job.created_at) > 0 ? Number(job.created_at) * 1000 : jobFlow.startedAt;
+    const seconds = started ? Math.max(0, Math.round(((done && job.completed_at ? job.completed_at * 1000 : Date.now()) - started) / 1000)) : 0;
+    const elapsed = seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+    box.hidden = false; box.classList.toggle('queued', job.status === 'queued');
+    $('site-progress-label').textContent = job.status === 'queued' && job.queue_position ? `排隊中（第 ${job.queue_position} 位）` : label;
+    $('site-progress-meta').textContent = `${percent}%${started ? ` · ${done ? '共' : '已經過'} ${elapsed}` : ''}`;
+    $('site-progress-fill').style.width = percent + '%';
+    $('site-progress-track').setAttribute('aria-valuenow', String(percent));
+    [...$('site-progress-steps').children].forEach((li, i) => { li.classList.toggle('done', i < step); li.classList.toggle('active', i === step); });
+  }
   async function pollJob() {
     if (!jobFlow.job || jobFlow.polling || state.destroyed) return;
     const id = jobFlow.job.id;
@@ -172,10 +196,10 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     try {
       const job = await adapters.jobs.get(id);
       if (state.destroyed || id !== jobFlow.job?.id) return;
-      jobFlow.job = job; jobFlow.coverage = job.coverage || jobFlow.coverage; showCoverage(jobFlow.coverage);
+      jobFlow.job = job; jobFlow.failures = 0; jobFlow.coverage = job.coverage || jobFlow.coverage; showCoverage(jobFlow.coverage);
       const messages = { queued: '任務已排隊，等待建模服務處理。', running: '正在取得資料並建立 SketchUp 模型；可保留此頁等候。', partial: '已產生部分成果，正在核對可下載檔案；樓高與地形等限制請查看成果報告。', succeeded: '建模已完成；只開放已驗證的實際檔案下載。', failed: `任務失敗：${job.error?.message || job.error?.code || '請稍後重試，或聯繫管理員。'}` };
       status('job-status', messages[job.status] || '正在讀取任務狀態。', job.status === 'failed' ? 'error' : job.status === 'partial' ? 'warning' : '');
-      $('job-stage').textContent = job.queue_position ? `共同佇列：第 ${job.queue_position} 位（A10-V1／A10-Site）` : job.stage ? `目前階段：${({ queued: '排隊', fetching: '取得資料', 'fetching-data': '取得資料', processing: '整理幾何', sketchup: 'SketchUp 建模與驗證', validating: '驗證檔案', completed: '完成', failed: '失敗' })[job.stage] || '建模處理中'}` : '';
+      $('job-stage').textContent = job.queue_position ? `共同佇列：第 ${job.queue_position} 位（A10-V1／A10-Site）` : '';
       if (['partial', 'succeeded'].includes(job.status)) {
         jobFlow.manifest = await adapters.downloads.get(id);
         if (state.destroyed || id !== jobFlow.job?.id) return;
@@ -185,7 +209,14 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       root.dispatchEvent(new CustomEvent('aias:job-updated', { bubbles: true, detail: structuredClone(job) }));
       if (activeJob()) jobFlow.timer = setTimeout(pollJob, 2000);
     } catch (error) {
-      if (!state.destroyed) status('job-status', `無法取得任務狀態：${error.message || '請恢復連線後按重新整理。'} 任務可能仍在處理中，請勿重複送出。`, 'error');
+      if (state.destroyed) return;
+      if (activeJob()) {
+        // Keep following the job: a dropped or slow request must never end the automatic updates.
+        jobFlow.failures = (jobFlow.failures || 0) + 1;
+        const wait = Math.min(30000, 3000 * jobFlow.failures);
+        status('job-status', `連線不穩，${Math.round(wait / 1000)} 秒後自動重試；任務仍在處理中，請勿重複送出。`, 'warning');
+        jobFlow.timer = setTimeout(pollJob, wait);
+      } else status('job-status', `無法取得任務狀態：${error.message || '請恢復連線後按重新整理。'} 任務可能仍在處理中，請勿重複送出。`, 'error');
     } finally { jobFlow.polling = false; update(); }
   }
   const update = () => {
@@ -377,6 +408,8 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   });
   listen($('accept-partial'), 'change', update);
   listen($('refresh-job'), 'click', pollJob);
+  // Background tabs throttle timers; catch up as soon as the page is visible again.
+  listen(document, 'visibilitychange', () => { if (!document.hidden && activeJob() && !jobFlow.polling) pollJob(); });
   listen($('generate-skp'), 'click', async () => {
     if ($('generate-skp').disabled || jobFlow.submitting || activeJob() || googleDerived()) return;
     let request;
@@ -399,7 +432,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       const job = await adapters.jobs.create({ request, acceptPartial: true, idempotencyKey: jobFlow.idempotencyKey });
       if (state.destroyed) return;
       if (!job.id || !['queued', 'running', 'partial', 'succeeded', 'failed'].includes(job.status)) throw new Error('建模服務回傳的任務資料不完整。');
-      jobFlow.job = job; jobFlow.requestBounds = structuredClone(request.bounds);
+      jobFlow.job = job; jobFlow.startedAt = Date.now(); jobFlow.requestBounds = structuredClone(request.bounds);
       status('job-status', '任務已建立，正在讀取狀態。');
       await pollJob();
     } catch (error) { if (!state.destroyed) status('job-status', `無法開始建模任務：${error.message || '請檢查連線後重試。'}`, 'error'); }

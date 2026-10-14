@@ -2,7 +2,12 @@ import {measureBounds} from './domain.js';
 export function remoteAdapters(context,config){
   const base=context.apiBase.replace(/\/$/,'');
   async function api(url,options={}){
-    const res=await fetch(base+url,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+context.token,...options.headers}});
+    // A request that never answers must not freeze the page: give up after 20 s (callers retry).
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+    let res;
+    try{res=await fetch(base+url,{...options,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+context.token,...options.headers}});}
+    catch(error){throw error?.name==='AbortError'?Error('連線逾時'):error;}
+    finally{clearTimeout(timer);}
     if(!res.ok){const data=await res.json().catch(()=>({}));throw Error(typeof data.detail==='string'?data.detail:'服務暫時無法使用');}
     return res;
   }
