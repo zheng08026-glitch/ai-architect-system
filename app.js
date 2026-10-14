@@ -523,6 +523,7 @@ const memberSummary = $("#memberSummary");
 const profileForm = $("#profileForm");
 const usageList = $("#usageList");
 const jobList = $("#jobList");
+const usagePages = $("#usagePages"), jobPages = $("#jobPages");
 const profileFields = {
   name: $("#profileName"),
   company: $("#profileCompany"),
@@ -536,6 +537,7 @@ const AUTH_EMAIL_KEY = "architect-ai-auth-email";
 const CLIENT_ID_KEY = "architect-ai-client-id";
 let memberJobs = [];
 let currentMember = null;
+let memberLoadVersion = 0;
 
 function getSupabaseConfig() {
   return {
@@ -670,8 +672,38 @@ function renderMemberSummary(profileData = {}, usageData = {}) {
   `;
 }
 
+function renderMemberRecordPages(pager, count, label) {
+  if (!pager) return;
+  const total = Math.min(count, 30);
+  pager.hidden = !total;
+  if (!total) { pager.replaceChildren(); return; }
+  const pages = Math.ceil(total / 10);
+  pager.innerHTML = `<span data-record-range role="status">第 1–${Math.min(total, 10)} 筆／共 ${total} 筆</span>
+    <nav aria-label="${label}分頁">${Array.from({length:pages}, (_, index) => `<button type="button" data-record-page="${index + 1}" aria-label="第 ${index + 1} 頁" ${index === 0 ? 'aria-current="page"' : ''}>${index + 1}</button>`).join('')}</nav>`;
+}
+
+function bindMemberRecordPages(pager, list) {
+  if (!pager || !list) return;
+  pager.addEventListener('click', event => {
+    const button = event.target.closest('[data-record-page]');
+    if (!button || !pager.contains(button)) return;
+    const rows = [...list.querySelectorAll('.record-item')];
+    const page = Number(button.dataset.recordPage);
+    if (!Number.isInteger(page) || page < 1 || page > Math.ceil(rows.length / 10)) return;
+    const start = (page - 1) * 10;
+    rows.forEach((row, index) => { row.hidden = index < start || index >= start + 10; });
+    for (const item of pager.querySelectorAll('[data-record-page]')) {
+      if (item === button) item.setAttribute('aria-current', 'page');
+      else item.removeAttribute('aria-current');
+    }
+    pager.querySelector('[data-record-range]').textContent = `第 ${start + 1}–${Math.min(start + 10, rows.length)} 筆／共 ${rows.length} 筆`;
+  });
+}
+
 function renderUsageList(records = []) {
   if (!usageList) return;
+  records = Array.isArray(records) ? records.slice(0, 30) : [];
+  renderMemberRecordPages(usagePages, records.length, "使用紀錄");
   if (!records.length) {
     usageList.innerHTML = "<span>尚無用量紀錄。註冊會員每月 A1-A8 共用 15 次，A9 可用 3 次。</span>";
     return;
@@ -683,10 +715,9 @@ function renderUsageList(records = []) {
     anon_a1_a2_daily: "匿名 A1-1/A1-2 今日試用額度",
   };
   usageList.innerHTML = records
-    .slice(0, 8)
     .map(
-      (record) => `
-        <div class="record-item">
+      (record, index) => `
+        <div class="record-item" ${index >= 10 ? "hidden" : ""}>
           <strong>${bucketLabels[record.bucket] || record.bucket || "使用額度"}</strong>
           <small>${record.used || 0}/${record.limit || 0}，剩餘 ${record.remaining ?? Math.max(0, (record.limit || 0) - (record.used || 0))}</small>
           <small>${record.period || ""}</small>
@@ -698,13 +729,14 @@ function renderUsageList(records = []) {
 
 function renderJobList(records = []) {
   if (!jobList) return;
+  records = Array.isArray(records) ? records.slice(0, 30) : [];
   memberJobs = records;
+  renderMemberRecordPages(jobPages, records.length, "近期任務");
   if (!records.length) {
     jobList.innerHTML = "<span>尚無任務紀錄。</span>";
     return;
   }
   jobList.innerHTML = records
-    .slice(0, 8)
     .map((job, index) => {
       const imageUrls = job.output_images || (job.output_image ? [job.output_image] : []);
       const videoUrls = job.output_videos || (job.output_video ? [job.output_video] : []);
@@ -713,7 +745,7 @@ function renderJobList(records = []) {
       const downloadUrl = imageUrls[0] || "";
       const errorMessage = getPublicJobError(job);
       return `
-        <div class="record-item" data-job-index="${index}">
+        <div class="record-item" data-job-index="${index}" ${index >= 10 ? "hidden" : ""}>
           <strong>${escapeHtml(job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
           <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}</small>
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
@@ -756,11 +788,18 @@ function hasAdminAccess(profileData = {}) {
 }
 
 async function loadMemberCenter() {
+  const version = ++memberLoadVersion;
   const email = getAuthEmail();
+  const token = getAuthToken();
+  const isCurrent = () => version === memberLoadVersion && email === getAuthEmail() && token === getAuthToken();
   setMemberCenterVisible(Boolean(email));
   setAdminVisible(false);
   currentMember = null;
-  if (!email || !getApiBase()) return;
+  if (!email || !getApiBase()) {
+    renderUsageList([]);
+    renderJobList([]);
+    return;
+  }
 
   try {
     const [profileData, usageData, jobsData] = await Promise.all([
@@ -768,6 +807,7 @@ async function loadMemberCenter() {
       fetchMemberJson("/api/member/usage"),
       fetchMemberJson("/api/member/jobs"),
     ]);
+    if (!isCurrent()) return;
     currentMember = profileData || null;
     siteEditorPromise?.then(editor => editor?.refreshAccess());
     setAdminVisible(hasAdminAccess(profileData));
@@ -776,7 +816,7 @@ async function loadMemberCenter() {
     renderUsageList(usageData?.usage || []);
     renderJobList(jobsData?.jobs || []);
   } catch (error) {
-    if (authMessage) authMessage.textContent = `${error.message}，請稍後再試。`;
+    if (isCurrent() && authMessage) authMessage.textContent = `${error.message}，請稍後再試。`;
   }
 }
 
@@ -3013,6 +3053,9 @@ async function loginWithGoogle() {
 }
 
 async function signOut() {
+  memberLoadVersion++;
+  renderUsageList([]);
+  renderJobList([]);
   resetA10View();
   const client = getSupabaseClient();
   if (client) await client.auth.signOut();
@@ -3078,6 +3121,8 @@ document.addEventListener("keydown", (event) => {
   renderHowToUse(getActiveSystem());
 });
 profileForm?.addEventListener("submit", saveProfile);
+bindMemberRecordPages(usagePages, usageList);
+bindMemberRecordPages(jobPages, jobList);
 jobList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-job]");
   if (!button) return;

@@ -2737,3 +2737,11 @@ body[data-theme="white"] .badge::before {
   .monitor-heading { align-items: flex-start; }
   .monitor-worker-title { flex-wrap: wrap; gap: 5px; }
 }
+
+/* Member history: latest 30 records, ten per page. */
+.member-records .record-item[hidden], .member-records .record-pagination[hidden] { display: none; }
+.member-records .record-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; font-size: 12px; color: var(--muted); }
+.member-records .record-pagination nav { display: flex; gap: 6px; }
+.member-records .record-pagination button { display: inline-grid; place-items: center; min-width: 32px; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line-soft); border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; }
+.member-records .record-pagination button[aria-current="page"] { color: var(--cyan); border-color: var(--cyan); background: var(--accent-soft); font-weight: 700; }
+.member-records .record-pagination button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
