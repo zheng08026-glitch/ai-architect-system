@@ -254,3 +254,55 @@ test('hidden page pauses and returning to a closed dialog does not restart reque
   dialog.open = true; documentRef.dispatchEvent(new Event('visibilitychange'));
   await flush(); assert.equal(calls, 6);
 });
+
+test('current authorization failure invokes the page access gate once; stale failures cannot sign out a newer account', async () => {
+  const timer = clock(), waiting = [], states = [];
+  let denied = 0;
+  let context = { allowed:true, token:'old-fixture-token', identity:'old@example.invalid', base:'https://fixture.invalid' };
+  const controller = createMonitorController({
+    readContext:() => context, onState:state => states.push(state),
+    onUnauthorized:() => { denied++; context = {...context, allowed:false}; },
+    fetchImpl:(url, options) => { const d = deferred(); waiting.push({...d,url,...options}); return d.promise; },
+    now:timer.now, schedule:timer.schedule, cancel:timer.cancel,
+  });
+  const oldWork = controller.start();
+  context = {...context, token:'new-fixture-token', identity:'new@example.invalid'};
+  const newWork = controller.start();
+  for (const entry of waiting.slice(3)) entry.resolve(response(payload(entry.url)));
+  await newWork;
+  for (const entry of waiting.slice(0,3)) entry.resolve(response({}, 403));
+  await oldWork;
+  assert.equal(denied, 0);
+  assert.equal(states.at(-1).active, true);
+  const currentWork = controller.refresh();
+  for (const entry of waiting.slice(6)) entry.resolve(response({}, entry.url.endsWith('/health') ? 200 : 403));
+  await currentWork;
+  assert.equal(denied, 1);
+  assert.equal(context.allowed, false);
+  assert.equal(states.at(-1).active, false);
+  assert.ok(Object.values(states.at(-1).sections).every(section => section.status === 'unauthorized' && section.data === null));
+  assert.equal(timer.size(), 0);
+});
+
+test('standalone page only resumes monitoring when its selected tab is active', async t => {
+  const previousFetch = globalThis.fetch;
+  const documentRef = new DocumentFixture(), host = documentRef.createElement('section');
+  let monitorSelected = false, calls = 0;
+  globalThis.fetch = async url => { calls++; return response(payload(url)); };
+  const controller = mountMonitor(host, {
+    readContext:() => ({ allowed:true, token:'fixture-token', identity:'fixture@example.invalid', base:'https://fixture.invalid' }),
+    isActive:() => monitorSelected, documentRef,
+  });
+  t.after(() => { controller.stop(); globalThis.fetch = previousFetch; });
+  documentRef.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(calls, 0);
+  monitorSelected = true;
+  documentRef.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(calls, 3);
+  documentRef.hidden = true; documentRef.dispatchEvent(new Event('visibilitychange'));
+  monitorSelected = false; documentRef.hidden = false; documentRef.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(calls, 3);
+  assert.ok(host.textContent.includes('監控已暫停'));
+  monitorSelected = true; documentRef.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(calls, 6);
+});

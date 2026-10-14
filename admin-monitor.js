@@ -1,5 +1,5 @@
 // Read-only operations monitor. Credentials stay in the request context, never in snapshots.
-export function createMonitorController({ readContext, onState, fetchImpl = fetch,
+export function createMonitorController({ readContext, onState, onUnauthorized = () => {}, fetchImpl = fetch,
   now = Date.now, schedule = setTimeout, cancel = clearTimeout,
   intervalMs = 15000, timeoutMs = 8000 } = {}) {
   const paths = { dispatch: '/api/health', workers: '/api/admin/workers', queue: '/api/admin/overview' };
@@ -57,7 +57,7 @@ export function createMonitorController({ readContext, onState, fetchImpl = fetc
     })).then(results => {
       if (!active || version !== generation) return;
       if (!contextMatches()) { stop('unauthorized'); return; }
-      if (results.some(result => result.auth)) { stop('unauthorized'); return; }
+      if (results.some(result => result.auth)) { stop('unauthorized'); onUnauthorized(); return; }
       for (const result of results) {
         const previous = sections[result.key];
         sections[result.key] = result.failed
@@ -101,7 +101,7 @@ export function workerPresentation(worker, observedAt) {
   };
 }
 
-export function mountMonitor(host, { readContext, dialog, documentRef = document } = {}) {
+export function mountMonitor(host, { readContext, dialog, isActive = () => Boolean(dialog?.open), onUnauthorized, documentRef = document } = {}) {
   const el = (tag, text, className) => {
     const node = documentRef.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -164,11 +164,11 @@ export function mountMonitor(host, { readContext, dialog, documentRef = document
     }
     table.append(body); const scroller = el('div', undefined, 'monitor-scroll'); scroller.append(table); workerArea.append(scroller);
   }
-  const controller = createMonitorController({ readContext, onState: render });
+  const controller = createMonitorController({ readContext, onState: render, onUnauthorized });
   refreshButton.addEventListener('click', controller.refresh);
   documentRef.addEventListener('visibilitychange', () => {
     if (documentRef.hidden) controller.stop();
-    else if (dialog.open) controller.start();
+    else if (isActive()) controller.start();
   });
   return controller;
 }

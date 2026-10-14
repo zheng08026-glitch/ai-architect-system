@@ -36,3 +36,28 @@
   Cache-Control: no-store
   CDN-Cache-Control: no-store
   Cloudflare-CDN-Cache-Control: no-store
+
+/admin.html
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
+
+/admin-page.js
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
+
+/admin-members.js
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
+
+/admin-access.js
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
+
+/admin.css
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store

@@ -7,6 +7,12 @@ import { dirname, join } from 'node:path'
 const staticRuntimeFiles = [
   'app.js',
   'admin-monitor.js',
+  'admin.html',
+  'admin-page.js',
+  'admin-members.js',
+  'admin-access.js',
+  'admin.css',
+  'styles.css',
   'a10-site',
   'a2-3-editor.js',
   'a2-3-editor.html',

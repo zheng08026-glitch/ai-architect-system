@@ -509,15 +509,6 @@ const howToUseClose = $("#howToUseClose");
 const authButton = $("#authButton");
 const adminButton = $("#adminButton");
 const memberAdminButton = $("#memberAdminButton");
-const adminDialog = $("#adminDialog");
-const adminMessage = $("#adminMessage");
-const adminOverview = $("#adminOverview");
-const adminMemberList = $("#adminMemberList");
-const adminRefresh = $("#adminRefresh");
-const adminDetail = $("#adminDetail");
-const adminDetailTitle = $("#adminDetailTitle");
-const adminDetailContent = $("#adminDetailContent");
-const adminDetailClose = $("#adminDetailClose");
 const authEmail = $("#authEmail");
 const authPassword = $("#authPassword");
 const authSubmit = $("#authSubmit");
@@ -755,25 +746,6 @@ async function fetchMemberJson(path) {
   return response.json();
 }
 
-async function fetchAdminJson(path, options = {}) {
-  const apiBase = getApiBase();
-  const token = getAuthToken();
-  if (!apiBase || !token) throw new Error("Admin API requires sign in.");
-  const response = await fetch(`${apiBase}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-      ...(options.headers || {}),
-    },
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || "Admin request failed.");
-  }
-  return response.json();
-}
-
 function setAdminVisible(isVisible) {
   if (adminButton) adminButton.hidden = !isVisible;
   if (memberAdminButton) memberAdminButton.hidden = !isVisible;
@@ -781,274 +753,6 @@ function setAdminVisible(isVisible) {
 
 function hasAdminAccess(profileData = {}) {
   return profileData?.role === "admin" || profileData?.is_primary_admin === true;
-}
-
-function renderAdminOverview(data = {}) {
-  if (!adminOverview) return;
-  const members = data.members || {};
-  const jobs = data.jobs || {};
-  const usage = data.usage || {};
-  const promotionalUsage = usage.member_a1_a8_monthly || {};
-  adminOverview.innerHTML = `
-    <div class="admin-stat"><span>Total members</span><strong>${members.total || 0}</strong></div>
-    <div class="admin-stat"><span>Active</span><strong>${members.by_status?.active || 0}</strong></div>
-    <div class="admin-stat"><span>Completed jobs</span><strong>${jobs.completed || 0}</strong></div>
-    <div class="admin-stat"><span>A1-A8 usage</span><strong>${promotionalUsage.used || 0}</strong></div>
-    <div class="admin-stat admin-stat-wide"><span>Primary admin</span><strong>${escapeHtml(members.primary_admin_email || "not set")}</strong></div>
-  `;
-}
-
-function renderAdminMembers(records = []) {
-  if (!adminMemberList) return;
-  if (!records.length) {
-    adminMemberList.innerHTML = "<span>No members yet.</span>";
-    return;
-  }
-  adminMemberList.innerHTML = records
-    .map((member) => {
-      const a1A8 = member.current_usage?.a1_a8 || {};
-      const a9 = member.current_usage?.a9 || {};
-      const a10 = member.current_usage?.a10 || {};
-      const jobs = member.job_summary || {};
-      const lastActivity = formatJobTime(jobs.last_activity_at) || "No activity";
-      return `
-        <div class="admin-member-card" data-admin-email="${escapeHtml(member.email)}">
-          <div class="admin-member-identity">
-            <strong>${escapeHtml(member.email)}${member.is_primary_admin ? ' <span class="tier-chip">Primary</span>' : ""}</strong>
-            <small>${escapeHtml(member.role || "member")} | last login ${escapeHtml(formatJobTime(member.last_login_at) || "never")}</small>
-            <div class="admin-usage-summary">
-              <span><strong>${Number(a1A8.remaining || 0)}</strong> A1-A8 left this month</span>
-              <span><strong>${Number(a9.remaining || 0)}</strong> A9 left this month</span>
-              <span><strong>${Number(a10.remaining || 0)}</strong> A10 independent credits</span>
-              <span><strong>${Number(jobs.completed || 0)}</strong> completed / ${Number(jobs.failed || 0)} failed</span>
-              <span>Last activity: ${escapeHtml(lastActivity)}</span>
-            </div>
-          </div>
-          <label>
-            Role
-            <select data-admin-field="role" ${member.is_primary_admin ? "disabled" : ""}>
-              ${["member", "admin"]
-                .map((role) => `<option value="${role}" ${member.role === role ? "selected" : ""}>${role}</option>`)
-                .join("")}
-            </select>
-          </label>
-          <label>
-            Plan
-            <select data-admin-field="plan">
-              ${["free", "plus", "pro", "ultra", "enterprise"]
-                .map((plan) => `<option value="${plan}" ${member.plan === plan ? "selected" : ""}>${plan}</option>`)
-                .join("")}
-            </select>
-          </label>
-          <label>
-            Status
-            <select data-admin-field="status">
-              ${["active", "trialing", "suspended", "banned", "deleted"]
-                .map((status) => `<option value="${status}" ${member.status === status ? "selected" : ""}>${status}</option>`)
-                .join("")}
-            </select>
-          </label>
-          <label>全功能開通
-            <input type="checkbox" data-full-access ${member.full_feature_access ? "checked" : ""} ${!currentMember?.can_manage_full_features || member.email === "zheng08026@gmail.com" ? "disabled" : ""}>
-            <button type="button" class="text-button" data-admin-action="full-access" ${!currentMember?.can_manage_full_features || member.email === "zheng08026@gmail.com" ? "disabled" : ""}>儲存開通設定</button>
-          </label>
-          <div class="admin-member-actions">
-            <button class="text-button" type="button" data-admin-action="details">Details</button>
-            <button class="text-button" type="button" data-admin-action="save">Save</button>
-            <button class="text-button" type="button" data-admin-action="grant-package">Open +50 / +5</button>
-            <button class="text-button" type="button" data-admin-action="grant-jpg">JPG +10</button>
-            <button class="text-button" type="button" data-admin-action="grant-mp4">MP4 +10</button>
-            <button class="text-button" type="button" data-admin-action="grant-a10">A10 +10</button>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function detailValue(value) {
-  const text = String(value || "").trim();
-  return escapeHtml(text || "Not provided");
-}
-
-function renderAdminMemberDetail(data = {}) {
-  if (!adminDetail || !adminDetailContent || !adminDetailTitle) return;
-  const member = data.member || {};
-  const profile = member.profile || {};
-  const usage = Array.isArray(data.usage) ? data.usage : [];
-  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-  const credits = Array.isArray(data.credits) ? data.credits : [];
-  const currentUsage = data.current_usage || {};
-  const a1A8Usage = currentUsage.a1_a8 || {};
-  const a9Usage = currentUsage.a9 || {};
-  const jobSummary = data.job_summary || {};
-
-  adminDetailTitle.textContent = member.email || "Member";
-  adminDetailContent.innerHTML = `
-    <div class="admin-detail-summary">
-      <div><span>A1-A8 remaining this month</span><strong>${Number(a1A8Usage.remaining || 0)}</strong><small>${Number(a1A8Usage.used || 0)}/${Number(a1A8Usage.limit || 0)} used</small></div>
-      <div><span>A9 remaining this month</span><strong>${Number(a9Usage.remaining || 0)}</strong><small>${Number(a9Usage.used || 0)}/${Number(a9Usage.limit || 0)} used</small></div>
-      <div><span>Total jobs</span><strong>${Number(jobSummary.total || 0)}</strong><small>${Number(jobSummary.completed || 0)} completed / ${Number(jobSummary.failed || 0)} failed</small></div>
-      <div><span>Last activity</span><strong>${detailValue(formatJobTime(jobSummary.last_activity_at))}</strong></div>
-    </div>
-    <div class="admin-detail-grid">
-      <div><span>Name</span><strong>${detailValue(profile.name)}</strong></div>
-      <div><span>Company / Studio</span><strong>${detailValue(profile.company)}</strong></div>
-      <div><span>Phone</span><strong>${detailValue(profile.phone)}</strong></div>
-      <div><span>Tax ID</span><strong>${detailValue(profile.tax_id)}</strong></div>
-      <div><span>Invoice title</span><strong>${detailValue(profile.invoice_title)}</strong></div>
-      <div><span>Profession / Role</span><strong>${detailValue(profile.profession)}</strong></div>
-      <div><span>Registered</span><strong>${detailValue(formatJobTime(member.created_at))}</strong></div>
-      <div><span>Last login</span><strong>${detailValue(formatJobTime(member.last_login_at))}</strong></div>
-      <div><span>Plan</span><strong>${detailValue(member.plan)}</strong></div>
-      <div><span>Status</span><strong>${detailValue(member.status)}</strong></div>
-    </div>
-    <div class="admin-detail-sections">
-      <section>
-        <h4>Usage</h4>
-        <div class="record-list">
-          ${
-            usage.length
-              ? usage
-                  .slice(0, 12)
-                  .map(
-                    (record) => `
-                      <div class="record-item">
-                        <strong>${detailValue(record.bucket)}</strong>
-                        <small>${Number(record.used || 0)}/${Number(record.limit || 0)} | ${detailValue(record.period)}</small>
-                      </div>
-                    `,
-                  )
-                  .join("")
-              : "<span>No usage records.</span>"
-          }
-        </div>
-      </section>
-      <section>
-        <h4>Recent jobs</h4>
-        <div class="record-list">
-          ${
-            jobs.length
-              ? jobs
-                  .slice(0, 12)
-                  .map(
-                    (job) => `
-                      <div class="record-item">
-                        <strong>${detailValue(job.system_id)} | ${detailValue(job.status)}</strong>
-                        <small>${detailValue(formatJobTime(job.completed_at || job.failed_at || job.created_at))}</small>
-                        ${job.error ? `<small>${detailValue(job.error)}</small>` : ""}
-                      </div>
-                    `,
-                  )
-                  .join("")
-              : "<span>No job records.</span>"
-          }
-        </div>
-      </section>
-      <section>
-        <h4>Credits and grants</h4>
-        <div class="record-list">
-          ${
-            credits.length
-              ? credits
-                  .slice(0, 12)
-                  .map(
-                    (entry) => `
-                      <div class="record-item">
-                        <strong>+${Number(entry.amount || 0)} ${detailValue(entry.bucket)}</strong>
-                        <small>${detailValue(entry.reason)} | ${detailValue(formatJobTime(entry.created_at))}</small>
-                      </div>
-                    `,
-                  )
-                  .join("")
-              : "<span>No credit records.</span>"
-          }
-        </div>
-      </section>
-    </div>
-  `;
-  adminDetail.hidden = false;
-  adminDetail.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-async function loadAdminMemberDetail(email) {
-  if (adminMessage) adminMessage.textContent = `Loading ${email}...`;
-  const data = await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}`);
-  renderAdminMemberDetail(data);
-  if (adminMessage) adminMessage.textContent = "Member detail loaded.";
-}
-
-async function loadAdminDashboard() {
-  if (!adminMessage) return;
-  adminMessage.textContent = "Loading admin data...";
-  if (adminDetail) adminDetail.hidden = true;
-  try {
-    const [overview, members] = await Promise.all([
-      fetchAdminJson("/api/admin/overview"),
-      fetchAdminJson("/api/admin/members"),
-    ]);
-    renderAdminOverview(overview);
-    renderAdminMembers(members.members || []);
-    adminMessage.textContent = "Admin data loaded.";
-  } catch (error) {
-    adminMessage.textContent = error.message || "Admin data failed to load.";
-  }
-}
-
-async function handleAdminMemberAction(event) {
-  const button = event.target.closest("[data-admin-action]");
-  if (!button) return;
-  const card = button.closest("[data-admin-email]");
-  if (!card) return;
-  const email = card.dataset.adminEmail;
-  const action = button.dataset.adminAction;
-  button.disabled = true;
-  if (adminMessage) adminMessage.textContent = "Saving admin change...";
-
-  try {
-    if(action === "full-access") {
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/full-access`,{method:"PATCH",body:JSON.stringify({enabled:card.querySelector('[data-full-access]').checked})});
-    } else if (action === "details") {
-      await loadAdminMemberDetail(email);
-    } else if (action === "save") {
-      const payload = {
-        role: card.querySelector('[data-admin-field="role"]')?.value,
-        plan: card.querySelector('[data-admin-field="plan"]')?.value,
-        status: card.querySelector('[data-admin-field="status"]')?.value,
-      };
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-    } else if (action === "grant-package") {
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant-package`, {
-        method: "POST",
-        body: JSON.stringify({
-          reason: "Promotional access opened by admin",
-        }),
-      });
-    } else if (action === "grant-a10") {
-      const amount = 10;
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
-        method: "POST", body: JSON.stringify({ bucket: "member_a10_lifetime", amount, reason: "A10 independent credits granted by admin" }),
-      });
-    } else if (action === "grant-jpg" || action === "grant-mp4") {
-      const isJpgGrant = action === "grant-jpg";
-      await fetchAdminJson(`/api/admin/members/${encodeURIComponent(email)}/grant`, {
-        method: "POST",
-        body: JSON.stringify({
-          bucket: isJpgGrant ? "member_a1_a8_monthly" : "member_a9_monthly",
-          amount: 10,
-          reason: isJpgGrant ? "JPG +10 granted by admin" : "MP4 +10 granted by admin",
-        }),
-      });
-    }
-    if (action !== "details") await loadAdminDashboard();
-  } catch (error) {
-    if (adminMessage) adminMessage.textContent = error.message || "Admin change failed.";
-  } finally {
-    button.disabled = false;
-  }
 }
 
 async function loadMemberCenter() {
@@ -1067,7 +771,6 @@ async function loadMemberCenter() {
     currentMember = profileData || null;
     siteEditorPromise?.then(editor => editor?.refreshAccess());
     setAdminVisible(hasAdminAccess(profileData));
-    if (adminDialog?.open) void startAdminMonitor();
     renderProfile(profileData?.profile || {});
     renderMemberSummary(profileData || {}, usageData || {});
     renderUsageList(usageData?.usage || []);
@@ -1078,7 +781,6 @@ async function loadMemberCenter() {
 }
 
 function updateAuthUi() {
-  adminMonitor?.checkAccess();
   const email = getAuthEmail();
   if (authButton) authButton.textContent = email ? "會員中心" : "登入";
   if (!email) setAdminVisible(false);
@@ -3311,8 +3013,6 @@ async function loginWithGoogle() {
 }
 
 async function signOut() {
-  adminMonitor?.stop('unauthorized');
-  if (adminDialog?.open) adminDialog.close();
   resetA10View();
   const client = getSupabaseClient();
   if (client) await client.auth.signOut();
@@ -3376,48 +3076,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || !isHowToUseOpen) return;
   isHowToUseOpen = false;
   renderHowToUse(getActiveSystem());
-});
-let adminMonitor, adminMonitorPromise;
-async function startAdminMonitor() {
-  const host = document.getElementById('adminMonitor');
-  if (!host || !adminDialog?.open || document.hidden) return;
-  try {
-    if (!adminMonitorPromise) {
-      adminMonitorPromise = import('./admin-monitor.js?v=20261014-monitor1').then(module => {
-        adminMonitor = module.mountMonitor(host, {
-          dialog: adminDialog,
-          readContext: () => ({
-            allowed: hasAdminAccess(currentMember) && Boolean(getAuthToken())
-              && String(currentMember?.email || '').toLowerCase() === String(getAuthEmail() || '').toLowerCase(),
-            token: getAuthToken(), identity: getAuthEmail(), base: getApiBase(),
-          }),
-        });
-        return adminMonitor;
-      }).catch(error => { adminMonitorPromise = null; throw error; });
-    }
-    const monitor = await adminMonitorPromise;
-    if (adminDialog.open && !document.hidden) await monitor.start();
-  } catch {
-    host.textContent = '主機監控載入失敗，請重新整理頁面。會員管理仍可使用。';
-  }
-}
-
-async function openAdminDialog() {
-  adminDialog?.showModal();
-  void startAdminMonitor();
-  await loadAdminDashboard();
-}
-
-adminButton?.addEventListener("click", openAdminDialog);
-memberAdminButton?.addEventListener("click", openAdminDialog);
-adminRefresh?.addEventListener("click", () => {
-  void loadAdminDashboard();
-  if (adminMonitor) void adminMonitor.refresh(); else void startAdminMonitor();
-});
-adminDialog?.addEventListener('close', () => adminMonitor?.stop());
-adminMemberList?.addEventListener("click", handleAdminMemberAction);
-adminDetailClose?.addEventListener("click", () => {
-  if (adminDetail) adminDetail.hidden = true;
 });
 profileForm?.addEventListener("submit", saveProfile);
 jobList?.addEventListener("click", (event) => {

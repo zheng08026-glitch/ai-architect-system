@@ -7,9 +7,10 @@
     "test:monitor": "node --test tests/admin-monitor.test.mjs",
     "test:a10": "node --check app.js && node tests/a10-status.test.mjs",
     "dev": "vite",
-    "build": "npm run test:a10 && npm run test:monitor && tsc -b && vite build",
+    "build": "npm run test:a10 && npm run test:monitor && npm run test:admin && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:admin": "node --test tests/admin-access.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.6",

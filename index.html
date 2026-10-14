@@ -14,7 +14,7 @@
     <meta property="og:image" content="./assets/hero-system.png" />
     <meta name="theme-color" content="#050711" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=admin-monitor-20261014-r1" />
+    <link rel="stylesheet" href="./styles.css?v=admin-page-20261014-r1" />
   </head>
   <body>
     <div class="site-shell">
@@ -34,7 +34,7 @@
         </nav>
 
         <div class="top-actions">
-          <button class="ghost-button" type="button" id="adminButton" hidden>Admin</button>
+          <a class="ghost-button" id="adminButton" hidden href="./admin.html" target="_blank" rel="noopener noreferrer">Admin</a>
           <button class="ghost-button" type="button" id="authButton" data-open-auth>登入</button>
         </div>
       </header>
@@ -443,7 +443,7 @@
               <h3>會員中心</h3>
             </div>
             <div class="member-panel-actions">
-              <button class="text-button" id="memberAdminButton" type="button" hidden>Admin</button>
+              <a class="text-button" id="memberAdminButton" hidden href="./admin.html" target="_blank" rel="noopener noreferrer">Admin</a>
               <button class="text-button" id="authSignOut" type="button">登出</button>
             </div>
           </div>
@@ -498,46 +498,9 @@
       </div>
     </dialog>
 
-    <dialog class="auth-dialog admin-dialog" id="adminDialog">
-      <form method="dialog">
-        <button class="dialog-close" aria-label="Close">?</button>
-      </form>
-      <div>
-        <p class="eyebrow"><span></span> Admin Console</p>
-        <h2>系統監控與會員管理</h2>
-        <p class="auth-note" id="adminMessage">Manage members, usage grants, plans, and account status.</p>
-
-        <section id="adminMonitor" class="admin-monitor" aria-label="主機與排單監控"><p>開啟後台後載入主機狀態。</p></section>
-
-        <h3 class="admin-members-heading">會員管理</h3>
-        <div class="admin-overview" id="adminOverview">
-          <span>Loading overview...</span>
-        </div>
-
-        <div class="admin-toolbar">
-          <button class="primary-button compact" type="button" id="adminRefresh">Refresh</button>
-        </div>
-
-        <div class="admin-member-list" id="adminMemberList">
-          <span>Loading members...</span>
-        </div>
-
-        <section class="admin-detail" id="adminDetail" hidden>
-          <div class="admin-detail-header">
-            <div>
-              <p class="panel-kicker">Member Detail</p>
-              <h3 id="adminDetailTitle">Member</h3>
-            </div>
-            <button class="text-button" type="button" id="adminDetailClose">Close</button>
-          </div>
-          <div id="adminDetailContent"></div>
-        </section>
-      </div>
-    </dialog>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=member-usage-20260604"></script>
     <script src="./a2-3-editor.js?v=a23-progress-compare-20261012-r2"></script>
-    <script src="./app.js?v=admin-monitor-20261014-r1"></script>
+    <script src="./app.js?v=admin-page-20261014-r1"></script>
   </body>
 </html>
