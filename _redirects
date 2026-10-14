@@ -1,1 +1,19 @@
+# Repository-only files (docs, tests, build config) are not part of the website.
+# Redirects win over static assets on Cloudflare Pages; 404 is not a supported status here.
+/DEPLOYMENT.md / 302
+/README.md / 302
+/GOOGLE_AUTH_SETUP.md / 302
+/tests/* / 302
+/src/* / 302
+/package.json / 302
+/package-lock.json / 302
+/config.example.js / 302
+/eslint.config.js / 302
+/vite.config.ts / 302
+/tsconfig.json / 302
+/tsconfig.app.json / 302
+/tsconfig.node.json / 302
+/.gitignore / 302
+/.gitattributes / 302
+
 /* /index.html 200
