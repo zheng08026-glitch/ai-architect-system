@@ -7,6 +7,7 @@ export function mountMembers(host, { request, readProfile }) {
   const refreshButton = find('adminRefresh');
   let listRevision = 0, detailRevision = 0, loaded = false;
   const busyCards = new WeakSet();
+  let detailOpener = null;
   const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
   const formatJobTime = value => {
     if (!value) return '';
@@ -197,17 +198,15 @@ function renderAdminMemberDetail(data = {}) {
       </section>
     </div>
   `;
-  adminDetail.hidden = false;
-  adminDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+
 }
 
 
   async function load() {
     const version = ++listRevision;
-    detailRevision++;
+    closeDetail();
     adminMessage.textContent = '正在讀取會員資料…';
     refreshButton.disabled = true;
-    adminDetail.hidden = true;
     try {
       const [overview, members] = await Promise.all([request('/api/admin/overview'), request('/api/admin/members')]);
       if (version !== listRevision) return;
@@ -219,26 +218,50 @@ function renderAdminMemberDetail(data = {}) {
       if (!error.stale && version === listRevision && readProfile()) adminMessage.textContent = error.message || '會員資料載入失敗，請稍後重試。';
     } finally { if (version === listRevision) refreshButton.disabled = false; }
   }
-  async function detail(email) {
+  function resetDetail() {
+    detailRevision++;
+    adminDetailContent.replaceChildren();
+    adminDetailContent.removeAttribute('aria-busy');
+    adminDetailTitle.textContent = '會員明細';
+    const opener = detailOpener;
+    detailOpener = null;
+    if (opener?.isConnected) opener.focus({preventScroll:true});
+  }
+  function closeDetail() {
+    if (adminDetail.open) adminDetail.close();
+    resetDetail();
+  }
+  async function detail(email, opener) {
     const version = ++detailRevision;
-    adminMessage.textContent = '正在讀取會員明細…';
-    const data = await request(`/api/admin/members/${encodeURIComponent(email)}`);
-    if (version !== detailRevision) return;
-    renderAdminMemberDetail(data);
-    adminMessage.textContent = '會員明細已載入。';
+    detailOpener = opener;
+    adminDetailTitle.textContent = email;
+    adminDetailContent.innerHTML = '<p role="status">正在讀取會員明細…</p>';
+    adminDetailContent.setAttribute('aria-busy', 'true');
+    if (!adminDetail.open) adminDetail.showModal();
+    adminDetailContent.scrollTop = 0;
+    try {
+      const data = await request(`/api/admin/members/${encodeURIComponent(email)}`);
+      if (version !== detailRevision || !adminDetail.open || !readProfile()) return;
+      renderAdminMemberDetail(data);
+    } catch (error) {
+      if (error.stale || version !== detailRevision || !adminDetail.open || !readProfile()) return;
+      adminDetailContent.innerHTML = `<p role="alert">${escapeHtml(error.message || '會員明細載入失敗，請關閉後重試。')}</p>`;
+    } finally {
+      if (version === detailRevision) adminDetailContent.removeAttribute('aria-busy');
+    }
   }
   async function action(event) {
     const button = event.target.closest('[data-admin-action]');
     const card = button?.closest('[data-admin-email]');
     if (!card || !readProfile() || busyCards.has(card)) return;
     const email = card.dataset.adminEmail, kind = button.dataset.adminAction;
+    if (kind === 'details') { await detail(email, button); return; }
     const version = listRevision;
     busyCards.add(card); button.disabled = true;
-    adminMessage.textContent = kind === 'details' ? '正在讀取會員明細…' : '正在儲存變更…';
+    adminMessage.textContent = '正在儲存變更…';
     try {
       const path = `/api/admin/members/${encodeURIComponent(email)}`;
-      if (kind === 'details') await detail(email);
-      else if (kind === 'full-access') {
+      if (kind === 'full-access') {
         if (!readProfile()?.can_manage_full_features || email === 'zheng08026@gmail.com') return;
         await request(path + '/full-access', {method:'PATCH', body:JSON.stringify({enabled:card.querySelector('[data-full-access]').checked})});
       } else if (kind === 'save') {
@@ -251,21 +274,22 @@ function renderAdminMemberDetail(data = {}) {
         const reason = kind === 'grant-a10' ? 'A10 independent credits granted by admin' : kind === 'grant-jpg' ? 'JPG +10 granted by admin' : 'MP4 +10 granted by admin';
         await request(path + '/grant', {method:'POST',body:JSON.stringify({bucket,amount:10,reason})});
       } else return;
-      if (kind !== 'details' && version === listRevision && readProfile()) await load();
+      if (version === listRevision && readProfile()) await load();
     } catch (error) {
       if (!error.stale && version === listRevision && readProfile()) adminMessage.textContent = error.message || '操作失敗，請稍後再試。';
     } finally { busyCards.delete(card); button.disabled = false; }
   }
   function clear() {
-    listRevision++; detailRevision++; loaded = false;
+    listRevision++; closeDetail(); loaded = false;
     adminMessage.textContent = '';
     adminOverview.replaceChildren(); adminMemberList.replaceChildren();
-    adminDetail.hidden = true; adminDetailContent.replaceChildren(); adminDetailTitle.textContent = '會員明細';
     refreshButton.disabled = false;
   }
   refreshButton.addEventListener('click', load);
   adminMemberList.addEventListener('click', action);
-  find('adminDetailClose').addEventListener('click', () => { detailRevision++; adminDetail.hidden = true; });
+  find('adminDetailClose').addEventListener('click', closeDetail);
+  adminDetail.addEventListener('cancel', event => { event.preventDefault(); closeDetail(); });
+  adminDetail.addEventListener('close', () => { if (!adminDetail.open) resetDetail(); });
   function updatePermissions() {
     for (const card of adminMemberList.querySelectorAll('[data-admin-email]')) {
       const disabled = !readProfile()?.can_manage_full_features || card.dataset.adminEmail === 'zheng08026@gmail.com';
@@ -273,5 +297,5 @@ function renderAdminMemberDetail(data = {}) {
       card.querySelector('[data-admin-action="full-access"]').disabled = disabled;
     }
   }
-  return { load, clear, updatePermissions, get loaded() { return loaded; } };
+  return { load, clear, closeDetail, updatePermissions, get loaded() { return loaded; } };
 }

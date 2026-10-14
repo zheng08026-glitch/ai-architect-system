@@ -1,5 +1,5 @@
 import { createAdminAccess } from './admin-access.js?v=20261014-r1';
-import { mountMembers } from './admin-members.js?v=20261014-r1';
+import { mountMembers } from './admin-members.js?v=20261014-detail-r2';
 import { mountMonitor } from './admin-monitor.js?v=20261014-monitor2';
 
 const byId = id => document.getElementById(id);
@@ -18,6 +18,7 @@ function showAccess(state) {
   byId('adminIdentity').textContent = ready ? state.identity : '管理員專用';
   byId('adminRetry').disabled = state.status === 'checking';
   if (!ready) {
+    members?.closeDetail();
     monitor?.stop(state.status === 'checking' ? 'paused' : 'unauthorized');
     if (!state.preserveDrafts || state.status !== 'checking') members?.clear();
     const messages = {
