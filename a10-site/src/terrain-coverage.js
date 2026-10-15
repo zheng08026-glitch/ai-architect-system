@@ -1,16 +1,22 @@
 import { measureBounds } from './domain.js';
 
-// 「含高程輸出」 samples the 內政部 20 m DTM held by the modelling host, which only covers 臺北市: 64 TWD97 / TM2 121 tiles
-// from taipei-dem-official.zip (sha256 f30d5586f33a…). The host rejects a range when any point of its sample grid falls
-// outside them (e.g. 板橋, 台中, 金門), so the same check runs here before a member submits.
-const TILES = [[303780,2760120,306380,2762960],[306300,2760140,308900,2762980],[308820,2760140,311420,2762980],[311360,2760160,313960,2763000],[301240,2762880,303840,2765720],[303780,2762900,306360,2765740],[306300,2762900,308880,2765740],[308820,2762920,311420,2765760],[311340,2762920,313940,2765760],[298720,2765640,301300,2768480],[301240,2765660,303840,2768500],[303760,2765660,306360,2768500],[306280,2765680,308880,2768520],[308800,2765680,311400,2768520],[311320,2765700,313920,2768540],[313860,2765700,316440,2768540],[316380,2765720,318980,2768560],[298700,2768420,301300,2771240],[301220,2768420,303820,2771260],[303740,2768440,306340,2771260],[306280,2768440,308860,2771280],[308800,2768460,311380,2771300],[311320,2768460,313920,2771300],[313840,2768480,316440,2771320],[316360,2768480,318960,2771320],[298700,2771180,301280,2774020],[301220,2771180,303800,2774020],[303740,2771200,306340,2774040],[306260,2771200,308860,2774040],[308780,2771220,311380,2774060],[311300,2771240,313900,2774080],[298680,2773940,301280,2776780],[301200,2773960,303800,2776800],[303720,2773960,306320,2776800],[306240,2773980,308840,2776820],[308760,2773980,311360,2776820],[311300,2774000,313880,2776840],[293640,2776700,296220,2779540],[296160,2776720,298740,2779540],[298680,2776720,301260,2779560],[301200,2776720,303780,2779560],[303720,2776740,306300,2779580],[306240,2776740,308820,2779580],[308760,2776760,311360,2779600],[311280,2776760,313880,2779620],[296140,2779480,298740,2782320],[298660,2779480,301260,2782320],[301180,2779500,303780,2782340],[303700,2779500,306300,2782340],[306220,2779520,308820,2782360],[308740,2779520,311340,2782360],[296140,2782240,298720,2785080],[298660,2782260,301240,2785100],[301180,2782260,303760,2785100],[303700,2782280,306280,2785120],[306220,2782280,308800,2785120],[308740,2782300,311320,2785140],[298640,2785020,301240,2787860],[301160,2785040,303760,2787880],[303680,2785040,306280,2787880],[306200,2785060,308800,2787900],[308720,2785060,311320,2787900],[303680,2787820,306260,2790660],[306200,2787820,308780,2790660]];
-export const RELIEF_COVERAGE_MESSAGE = '「含高程輸出」目前只涵蓋臺北市；此範圍請改選「1. 全平面輸出」後再送出。';
+// 「含高程輸出」 samples 內政部 2025 年版 20 m DTM on the modelling host: three rasters, each in its own TM2 zone
+// (臺灣本島 121; 澎湖、金門 119 — never mixed, their numbers overlap). A point is covered when it lies within a raster's
+// extent plus a 5 km sea margin (sea is filled with 0 m there); 連江縣（馬祖） and open sea are not. Same rule and
+// sample grid as the host's terrain2025.mjs, so the member is told before submitting. Fully-sea ranges (or 綠島、龜山島,
+// which the rasters do not cover) are only detectable from the raster data, so the host rejects those with a reason.
+const SOURCES = [
+  { id: 'kinmen', zone: 119, west: 169600, east: 197580, south: 2697600, north: 2714380 },
+  { id: 'penghu', zone: 119, west: 282140, east: 324220, south: 2565000, north: 2634100 },
+  { id: 'taiwan', zone: 121, west: 150980, east: 351660, south: 2422140, north: 2799160 },
+];
+const SEA_MARGIN_M = 5000;
+export const RELIEF_COVERAGE_MESSAGE = '「含高程輸出」不涵蓋此範圍：連江縣（馬祖）與外海沒有官方地形資料；請改選「1. 全平面輸出」後再送出。';
 
-// Same GRS80 / TM2 zone 121 series as the host's terrain.mjs projectTwd97 (WGS84 treated as TWD97 geographic).
-function projectTwd97(lng, lat) {
-  if (!Number.isFinite(lng) || !Number.isFinite(lat) || lng < 119 || lng > 123 || lat < 20 || lat > 28) return null;
+// Same GRS80 / TM2 series as the host (WGS84 treated as TWD97 geographic), with the zone's central meridian.
+function projectTm2(lng, lat, zone) {
   const a = 6378137, f = 1 / 298.257222101, e = Math.sqrt(f * (2 - f)), radians = Math.PI / 180;
-  const n = f / (2 - f), phi = lat * radians, lambda = (lng - 121) * radians;
+  const n = f / (2 - f), phi = lat * radians, lambda = (lng - zone) * radians;
   const conformal = Math.atan(Math.sinh(Math.asinh(Math.tan(phi)) - e * Math.atanh(e * Math.sin(phi))));
   const xiPrime = Math.atan2(Math.tan(conformal), Math.cos(lambda));
   const etaPrime = Math.asinh(Math.sin(lambda) / Math.hypot(Math.tan(conformal), Math.cos(lambda)));
@@ -31,17 +37,24 @@ function projectTwd97(lng, lat) {
   const A = a / (1 + n) * (1 + n ** 2 / 4 + n ** 4 / 64 + n ** 6 / 256);
   return [250000 + 0.9999 * A * eta, 0.9999 * A * xi];
 }
-const covered = (lng, lat) => { const p = projectTwd97(lng, lat); return !!p && TILES.some(([w, s, e, n]) => p[0] >= w && p[0] <= e && p[1] >= s && p[1] <= n); };
+const locate = (lng, lat) => {
+  if (!Number.isFinite(lng) || !Number.isFinite(lat) || lat < 20 || lat > 28 || lng < 117 || lng > 123) return null;
+  for (const s of SOURCES) {
+    const [x, y] = projectTm2(lng, lat, s.zone);
+    if (x >= s.west - SEA_MARGIN_M && x <= s.east + SEA_MARGIN_M && y >= s.south - SEA_MARGIN_M && y <= s.north + SEA_MARGIN_M) return s.id;
+  }
+  return null;
+};
 
-/** True when every point the host samples for 含高程輸出 (centre + grid at ≤ 20 m spacing) lies inside the DTM tiles. */
+/** True when every point the host samples for 含高程輸出 (centre + grid at ≤ 20 m spacing) falls in one DTM source. */
 export function reliefCovered(bounds) {
   let size;
   try { size = measureBounds(bounds); } catch { return false; }
-  const { west, south, east, north } = bounds;
-  if (!covered((west + east) / 2, (south + north) / 2)) return false;
+  const { west, south, east, north } = bounds, source = locate((west + east) / 2, (south + north) / 2);
+  if (!source) return false;
   const segments = Math.max(2, Math.ceil(Math.max(size.widthM, size.depthM) / 20));
   for (let row = 0; row <= segments; row++) for (let column = 0; column <= segments; column++) {
-    if (!covered(column === segments ? east : west + (east - west) * column / segments, row === segments ? north : south + (north - south) * row / segments)) return false;
+    if (locate(column === segments ? east : west + (east - west) * column / segments, row === segments ? north : south + (north - south) * row / segments) !== source) return false;
   }
   return true;
 }

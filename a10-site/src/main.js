@@ -71,7 +71,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     return '';
   }
   const sameBounds = (a, b) => !!a && !!b && ['west', 'south', 'east', 'north'].every(key => Number.isFinite(a[key]) && Number.isFinite(b[key]) && Math.abs(a[key] - b[key]) < 1e-7);
-  // 含高程輸出 only has DTM data for 臺北市; checked once per range because a 2 km grid takes ~20 ms.
+  // 含高程輸出 has DTM data for 臺灣本島、澎湖、金門 only; checked once per range because a 2 km grid takes ~30 ms.
   let reliefCheck = { key: '', covered: true };
   const reliefOutside = () => {
     if (state.terrainMode !== 'relief' || !state.bounds) return false;
@@ -415,7 +415,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   listen($('terrain-mode'), 'change', () => {
     state.terrainMode=$('terrain-mode').value;
     state.confirmedAt=null; $('accept-partial').checked=false;
-    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，所有建物基底使用 Z=0；地面使用最小平面，不含密集地形網格。' : '保留來源地形起伏，隱藏內部三角網格線；高程不是基地實測。目前只涵蓋臺北市。';
+    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，所有建物基底使用 Z=0；地面使用最小平面，不含密集地形網格。' : '保留來源地形起伏，隱藏內部三角網格線；高程不是基地實測。涵蓋臺灣本島、澎湖、金門，海面以 0 m 表示。';
     update();
   });
   listen($('accept-partial'), 'change', update);
