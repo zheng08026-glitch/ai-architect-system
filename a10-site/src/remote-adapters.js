@@ -1,4 +1,5 @@
 import {measureBounds} from './domain.js';
+import {reliefCovered,RELIEF_COVERAGE_MESSAGE} from './terrain-coverage.js';
 export function remoteAdapters(context,config){
   const base=context.apiBase.replace(/\/$/,'');
   async function api(url,options={}){
@@ -22,7 +23,8 @@ export function remoteAdapters(context,config){
       const data=await response.json();
       return {provider:'photon',candidates:(data.features||[]).filter(f=>f.geometry?.type==='Point').map((f,i)=>({id:'photon:'+i,label:[f.properties.name,f.properties.street,f.properties.housenumber,f.properties.city].filter(Boolean).join(' '),lng:f.geometry.coordinates[0],lat:f.geometry.coordinates[1],precision:'unverified',requiresConfirmation:true}))};
     }},
-    coverage:{check:async({request})=>{const m=measureBounds(request.bounds);if(m.widthM>2000.001||m.depthM>2000.001)throw Error('範圍上限為 2000 × 2000 公尺');return coverage;}},
+    coverage:{check:async({request})=>{const m=measureBounds(request.bounds);if(m.widthM>2000.001||m.depthM>2000.001)throw Error('範圍上限為 2000 × 2000 公尺');
+      if(request.requestedOutputs?.terrainMode==='relief'&&!reliefCovered(request.bounds))throw Error(RELIEF_COVERAGE_MESSAGE);return coverage;}},
     jobs:{create:async({request,idempotencyKey})=>{
       // Preserve consent timestamps as well as geometry when retrying an ambiguous POST.
       if(submission?.key!==idempotencyKey)submission={key:idempotencyKey,body:JSON.stringify({request,request_key:idempotencyKey})};

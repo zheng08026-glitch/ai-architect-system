@@ -3,6 +3,7 @@ import { createLeafletMap } from './map.js';
 import { createGoogleMap } from './google-map.js';
 import { createGoogleServices } from './google-services.js';
 import { boundsFromCenter, measureBounds, validateBounds, buildRequest } from './domain.js';
+import { reliefCovered, RELIEF_COVERAGE_MESSAGE } from './terrain-coverage.js';
 
 /** Mount into a root with index.html's component markup. State belongs to this instance only. */
 export async function mountSiteModel(root, { adapters = createHttpAdapters(), mapFactory = createLeafletMap, googleMapFactory = createGoogleMap, googleServicesFactory = createGoogleServices, onRequest } = {}) {
@@ -70,6 +71,14 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     return '';
   }
   const sameBounds = (a, b) => !!a && !!b && ['west', 'south', 'east', 'north'].every(key => Number.isFinite(a[key]) && Number.isFinite(b[key]) && Math.abs(a[key] - b[key]) < 1e-7);
+  // 含高程輸出 only has DTM data for 臺北市; checked once per range because a 2 km grid takes ~20 ms.
+  let reliefCheck = { key: '', covered: true };
+  const reliefOutside = () => {
+    if (state.terrainMode !== 'relief' || !state.bounds) return false;
+    const key = JSON.stringify(state.bounds);
+    if (reliefCheck.key !== key) reliefCheck = { key, covered: reliefCovered(state.bounds) };
+    return !reliefCheck.covered;
+  };
   const activeJob = () => ['queued', 'running'].includes(jobFlow.job?.status);
   const matchesJob = () => JSON.stringify(jobFlow.job?.requestedOutputs?.siteOptions || {}) === JSON.stringify(state.siteOptions) && (jobFlow.job?.requestedOutputs?.terrainMode || 'relief') === state.terrainMode && sameBounds(state.bounds, jobFlow.job?.bounds || jobFlow.requestBounds);
   function artifactUrl(type) {
@@ -128,8 +137,11 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('model-source-description').textContent=heightText+terrainText+contextText;
     $('partial-consent-description').textContent='同意產生部分成果：'+heightText+terrainText+contextText+(state.siteOptions.aerialMode==='private-photo2'?'官方航照僅內嵌私人模型，原始標示保留；取得失敗會列入缺漏。':'未選擇官方航照內嵌。');
     $('worker-state').textContent = enabled ? '建模服務可用' : '建模服務未啟用';
+    const reliefBlocked = reliefOutside();
+    $('relief-coverage-warning').hidden = !reliefBlocked;
+    $('relief-coverage-warning').textContent = reliefBlocked ? RELIEF_COVERAGE_MESSAGE : '';
     $('accept-partial').disabled = !enabled || !confirmed || busy;
-    $('generate-skp').disabled = !enabled || !confirmed || !$('accept-partial').checked || busy || complete;
+    $('generate-skp').disabled = !enabled || !confirmed || !$('accept-partial').checked || busy || complete || reliefBlocked;
     $('generate-skp').textContent = jobFlow.submitting ? '檢查與送出中…' : activeJob() ? '建模中…' : complete ? '此範圍已有成果' : '產生基地模型 SKP';
     $('generate-skp').title = enabled ? '由 AIAS 建模服務執行；航照須通過來源授權與影像驗證' : '本功能使用需管理員開通';
     $('download-skp').disabled = !confirmed || !current || !artifactUrl('model');
@@ -164,7 +176,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     if (!enabled) $('export-state').textContent = '本功能使用需管理員開通';
     else if (complete) $('export-state').textContent = aerialAvailable ? `部分 SKP 與授權${imageryLabel}可用；請一併閱讀成果報告` : '部分 SKP 可用；尚無可下載的授權航照，請一併閱讀成果報告';
     if (complete && jobFlow.job?.coverage?.privateAerialEmbedded) $('export-state').textContent='部分 SKP 已含航照貼圖；請一併閱讀成果報告';
-    else if (confirmed && !complete) $('export-state').textContent = '已確認範圍；請確認部分成果限制後送出';
+    else if (confirmed && !complete) $('export-state').textContent = reliefBlocked ? RELIEF_COVERAGE_MESSAGE : '已確認範圍；請確認部分成果限制後送出';
   }
   // Stage reported by the worker → [label, fallback %, step index (0 排隊 … 4 回傳成果, 5 = all done)]
   const SITE_STAGES = { queued: ['排隊中', 0, 0], leased: ['準備資料', 5, 1], preparing: ['準備資料', 5, 1],
@@ -403,7 +415,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   listen($('terrain-mode'), 'change', () => {
     state.terrainMode=$('terrain-mode').value;
     state.confirmedAt=null; $('accept-partial').checked=false;
-    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，所有建物基底使用 Z=0；地面使用最小平面，不含密集地形網格。' : '保留來源地形起伏，隱藏內部三角網格線；高程不是基地實測。';
+    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，所有建物基底使用 Z=0；地面使用最小平面，不含密集地形網格。' : '保留來源地形起伏，隱藏內部三角網格線；高程不是基地實測。目前只涵蓋臺北市。';
     update();
   });
   listen($('accept-partial'), 'change', update);
