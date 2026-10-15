@@ -1,6 +1,6 @@
-import { mountSiteModel } from './main.js?v=20261015-terrain';
-import { remoteAdapters } from './remote-adapters.js?v=20261015-terrain';
-import publicConfig from './public-config.js?v=20261015-terrain';
+import { mountSiteModel } from './main.js?v=20261015-aerial';
+import { remoteAdapters } from './remote-adapters.js?v=20261015-aerial';
+import publicConfig from './public-config.js?v=20261015-aerial';
 
 const asset = path => new URL(path, import.meta.url).href;
 let leafletReady;
@@ -25,7 +25,7 @@ export async function mount(host, platform) {
   template.querySelectorAll('.app-header, .page-title, footer, script').forEach(node => node.remove());
   await loadLeaflet();
   const shadow = host.attachShadow({ mode: 'open' });
-  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261015-terrain', '../embedded.css?v=20261015-terrain'].map(path => new Promise((resolve, reject) => {
+  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261015-aerial', '../embedded.css?v=20261015-aerial'].map(path => new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet'; link.href = asset(path); link.onload = resolve;
     link.onerror = () => reject(Error('工作區樣式載入失敗，請重試。'));

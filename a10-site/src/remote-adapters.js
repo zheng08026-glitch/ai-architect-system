@@ -14,7 +14,13 @@ export function remoteAdapters(context,config){
   }
   const coverage={status:'partial',gaps:[{message:'建築高度、街廓與地形來源均有限制，請以成果報告為準。'}]};
   let submission=null;
-  const adapt=j=>({...j,id:j.job_id,status:({pending:'queued',processing:'running',finalizing:'running',completed:'partial',failed:'failed'})[j.status],coverage,error:j.public_error?{message:j.public_error}:null});
+  // The worker's verified summary says whether PHOTO2 really went into the SKP; no-data areas (e.g. 馬祖) do not.
+  const jobCoverage=j=>{
+    const s=j.model_summary;if(!s)return coverage;
+    const embedded=s.privateAerialEmbedded===true,missing=!embedded&&j.requestedOutputs?.siteOptions?.aerialMode==='private-photo2';
+    return {...coverage,privateAerialEmbedded:embedded,gaps:[...coverage.gaps,...(missing?[{message:'本次未取得官方航照（國土測繪中心 PHOTO2 在此範圍無影像或取得失敗）；模型未內嵌航照，地面與街廓為灰色。'}]:[])]};
+  };
+  const adapt=j=>({...j,id:j.job_id,status:({pending:'queued',processing:'running',finalizing:'running',completed:'partial',failed:'failed'})[j.status],coverage:jobCoverage(j),error:j.public_error?{message:j.public_error}:null});
   return {
     config:{get:async()=>config},
     geocoder:{search:async(query,{signal}={})=>{
