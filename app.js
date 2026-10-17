@@ -982,22 +982,41 @@ const systemArtworkCrops = {
   A2: { box: [338, 270, 166, 110], clip: "375,270 504,270 504,363 469,363 469,367 416,367 416,380 405,380 405,367 338,367 338,284 375,284" },
   A3: { box: [549, 289, 194, 74] },
   A4: { box: [798, 276, 176, 96], clip: "878,276 974,276 974,363 941,363 941,372 798,372 798,286 878,286" },
-  A5: { box: [1065, 267, 162, 114], clip: "1100,267 1227,267 1227,363 1192,363 1192,381 1065,381 1065,283 1100,283" },
-  A6: { box: [82, 508, 167, 125], clip: "140,508 249,508 249,633 82,633 82,525 140,525" },
+  A5: { box: [1065, 267, 162, 114], clip: "1100,267 1227,267 1227,363 1192,363 1192,381 1080,381 1080,369 1065,369 1065,283 1100,283" },
+  A6: { box: [82, 508, 167, 125], clip: "140,508 249,508 249,624 231,624 231,633 82,633 82,525 140,525" },
   A7: { box: [335, 511, 162, 115], clip: "375,511 497,511 497,626 335,626 335,526 375,526" },
   A8: { box: [577, 525, 157, 104] },
   A9: { box: [791, 529, 190, 90] },
-  A10: { box: [1039, 532, 194, 103], clip: "1039,532 1233,532 1233,621 1189,621 1189,635 1039,635" },
+  A10: { box: [1039, 532, 194, 103], clip: "1039,532 1233,532 1233,621 1189,621 1189,635 1080,635 1080,631 1039,631" },
 };
 
 function systemIllustration(systemId, className) {
   const familyId = systemId.match(/^A\d+/)?.[0] || "A1";
   const crop = systemArtworkCrops[familyId] || systemArtworkCrops.A1;
   const clipId = `artwork-${familyId}-${className}`;
+  const filterId = `${clipId}-background`;
   const [x, y, width, height] = crop.box;
+  // The reference's navy background is below blue=74; the purple artwork is
+  // above blue=110. Keep the original geometry and soften only this alpha edge.
+  const backgroundKey = "1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 7.0833 0 -2.0556";
+  const filterBounds = `filterUnits="userSpaceOnUse" x="${x}" y="${y}" width="${width}" height="${height}" color-interpolation-filters="sRGB"`;
   return `<svg class="${className}" viewBox="${crop.box.join(" ")}" width="200" height="120" aria-hidden="true" focusable="false" overflow="hidden">
-    <defs><clipPath id="${clipId}">${crop.clip ? `<polygon points="${crop.clip}" />` : `<rect x="${x}" y="${y}" width="${width}" height="${height}" />`}</clipPath></defs>
-    <image href="./assets/system-icons/reference-22962.jpg" width="1280" height="720" clip-path="url(#${clipId})" />
+    <defs>
+      <clipPath id="${clipId}">${crop.clip ? `<polygon points="${crop.clip}" />` : `<rect x="${x}" y="${y}" width="${width}" height="${height}" />`}</clipPath>
+      <filter id="${filterId}" ${filterBounds}>
+        <feColorMatrix type="matrix" values="${backgroundKey}" />
+      </filter>
+      <filter id="${filterId}-light" ${filterBounds}>
+        <feColorMatrix in="SourceGraphic" type="matrix" values="${backgroundKey}" result="keyed" />
+        <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 12 -12 0 1.5" result="neutral" />
+        <feComposite in="SourceGraphic" in2="neutral" operator="out" result="purple" />
+        <feFlood flood-color="#29263d" result="ink" />
+        <feComposite in="ink" in2="neutral" operator="in" result="strokes" />
+        <feComposite in="purple" in2="strokes" operator="arithmetic" k2="1" k3="1" result="colored" />
+        <feComposite in="colored" in2="keyed" operator="in" />
+      </filter>
+    </defs>
+    <image class="artwork-pixels" href="./assets/system-icons/reference-22962.jpg" width="1280" height="720" filter="url(#${filterId})" style="--artwork-light-filter: url(#${filterId}-light)" clip-path="url(#${clipId})" />
   </svg>`;
 }
 
