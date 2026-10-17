@@ -2730,6 +2730,8 @@ body[data-theme="white"] .badge::before {
 .monitor-badge[data-tone="ok"] { color: #20ae8d; }
 .monitor-badge[data-tone="warning"] { color: #c79b38; }
 .monitor-badge[data-tone="error"] { color: #e56078; }
+.monitor-badge[data-tone="neutral"] { color: var(--muted); }
+.monitor-table small.monitor-status-note { white-space: normal; max-width: 9em; }
 .admin-members-heading { margin: 24px 0 4px; }
 @media (max-width: 680px) {
   .admin-monitor { padding: 12px; }

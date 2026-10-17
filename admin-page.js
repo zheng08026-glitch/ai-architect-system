@@ -1,6 +1,6 @@
 import { createAdminAccess } from './admin-access.js?v=20261014-r1';
 import { mountMembers } from './admin-members.js?v=20261014-detail-r2';
-import { mountMonitor } from './admin-monitor.js?v=20261014-monitor2';
+import { mountMonitor } from './admin-monitor.js?v=20261017-sharedhost';
 
 const byId = id => document.getElementById(id);
 const content = byId('adminContent'), gate = byId('adminGate');

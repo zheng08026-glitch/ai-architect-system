@@ -86,19 +86,46 @@ export function createMonitorController({ readContext, onState, onUnauthorized =
 
 const timeText = value => value ? new Date(value).toLocaleTimeString('zh-TW', { hour12: false }) : '尚無成功更新';
 const safeNumber = value => Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
-export function workerPresentation(worker, observedAt) {
+// Worker names that run on one physical PC with one GPU. The owner switches the PC between modes, so only one
+// of them reports at a time: the silent one is standing by, not missing.
+export const SHARED_HOSTS = [
+  { host: '5060 Ti 16G（long5060-1）', modes: { 'LONG5060-1': 'A10 建模', '5060TI-1': 'A1–A8 出圖' } },
+];
+const upperName = worker => String(worker?.worker_name || '').toUpperCase();
+const hostGroup = name => SHARED_HOSTS.find(group => Object.hasOwn(group.modes, name));
+export function sharedHost(name, workers = []) {
+  const key = String(name || '').toUpperCase(), group = hostGroup(key);
+  if (!group) return null;
+  const sibling = workers.find(other => other?.online === true && upperName(other) !== key && Object.hasOwn(group.modes, upperName(other)));
+  return { host: group.host, mode: group.modes[key], activeMode: sibling ? group.modes[upperName(sibling)] : null };
+}
+export function workerPresentation(worker, observedAt, shared = null) {
   const lastSeen = Number(worker.last_seen_at);
   const age = Number.isFinite(lastSeen) && lastSeen > 0 ? Math.max(0, Math.floor(observedAt / 1000 - lastSeen)) : null;
   const recent = age === null ? '尚無回報時間' : age < 60 ? `${age} 秒前` : `${Math.floor(age / 60)} 分鐘前`;
   const online = worker.online === true;
+  const standby = !online && Boolean(shared?.activeMode);
   const busy = Boolean(worker.current_job_id) || ['busy', 'processing', 'finalizing'].includes(worker.state);
   return {
     name: String(worker.worker_name || '未命名主機'),
-    status: !online ? '未回報' : busy ? '處理中' : worker.state === 'idle' ? '待命' : '有回報・狀態待確認',
-    tone: !online ? 'error' : busy || worker.state !== 'idle' ? 'warning' : 'ok',
+    status: standby ? '待用' : !online ? '未回報' : busy ? '處理中' : worker.state === 'idle' ? '待命' : '有回報・狀態待確認',
+    statusNote: standby ? `本機目前為${shared.activeMode}模式` : '',
+    tone: standby ? 'neutral' : !online ? 'error' : busy || worker.state !== 'idle' ? 'warning' : 'ok',
     recent, job: String(worker.current_job_id || '—'),
     systems: Array.isArray(worker.supported_systems) ? worker.supported_systems.join('、') : '尚未回報',
+    host: shared ? `同一台主機：${shared.host}，此名稱負責${shared.mode}` : '',
   };
+}
+// Keep the names of one shared PC on adjacent rows, at the position of the first of them.
+export function orderWorkers(workers) {
+  const ordered = [];
+  for (const worker of workers) {
+    if (ordered.includes(worker)) continue;
+    ordered.push(worker);
+    const group = hostGroup(upperName(worker));
+    if (group) ordered.push(...workers.filter(other => !ordered.includes(other) && Object.hasOwn(group.modes, upperName(other))));
+  }
+  return ordered;
 }
 
 export function mountMonitor(host, { readContext, dialog, isActive = () => Boolean(dialog?.open), onUnauthorized, documentRef = document } = {}) {
@@ -116,7 +143,7 @@ export function mountMonitor(host, { readContext, dialog, isActive = () => Boole
   const notice = el('p', '正在讀取狀態…', 'monitor-notice'); notice.setAttribute('role', 'status');
   const summary = el('div', undefined, 'monitor-summary');
   const workerArea = el('div', undefined, 'monitor-worker-area');
-  const note = el('p', '「未回報」可能是程式停止、維護或網路中斷，不等於主機關機。有回報只代表工作程式仍在聯絡；不保證 GPU、SketchUp 或任務進度正常。', 'monitor-muted');
+  const note = el('p', '「未回報」可能是程式停止、維護或網路中斷，不等於主機關機。有回報只代表工作程式仍在聯絡；不保證 GPU、SketchUp 或任務進度正常。同一台主機的兩個名稱（例如 5060 Ti 的 A10 建模與 A1–A8 出圖）共用一張顯示卡，同時只會有一個在線，另一個顯示「待用」屬正常。', 'monitor-muted');
   host.append(heading, notice, summary, workerArea, note);
   const card = (label, value, tone, detail) => {
     const node = el('div', undefined, 'monitor-card'); node.dataset.tone = tone;
@@ -155,10 +182,13 @@ export function mountMonitor(host, { readContext, dialog, isActive = () => Boole
     for (const label of ['主機／支援功能', '狀態', '最近回報', '目前任務']) { const th = el('th', label); th.scope = 'col'; header.append(th); }
     const thead = el('thead'); thead.append(header); table.append(thead);
     const body = el('tbody');
-    for (const record of workers.data.workers) {
-      const worker = workerPresentation(record, snapshot.observedAt), row = el('tr');
+    const records = workers.data.workers;
+    for (const record of orderWorkers(records)) {
+      const worker = workerPresentation(record, snapshot.observedAt, sharedHost(record.worker_name, records)), row = el('tr');
       const name = el('td'); name.append(el('strong', worker.name), el('small', worker.systems));
+      if (worker.host) name.append(el('small', worker.host));
       const state = el('td'), badge = el('span', worker.status, 'monitor-badge'); badge.dataset.tone = worker.tone; state.append(badge);
+      if (worker.statusNote) state.append(el('small', worker.statusNote, 'monitor-status-note'));
       const job = el('td'); job.append(el('code', worker.job));
       row.append(name, state, el('td', worker.recent), job); body.append(row);
     }

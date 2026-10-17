@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMonitorController, mountMonitor, workerPresentation } from '../admin-monitor.js';
+import { createMonitorController, mountMonitor, orderWorkers, sharedHost, workerPresentation } from '../admin-monitor.js';
 
 const INITIAL_TIME = 1_800_000_000_000;
 const flush = async () => { for (let i = 0; i < 16; i++) await Promise.resolve(); };
@@ -203,6 +203,33 @@ test('worker labels distinguish heartbeat from confirmed hardware health', () =>
   assert.equal(workerPresentation({ ...worker, online: false }, INITIAL_TIME).status, '未回報');
 });
 
+test('one PC with two worker names: the silent mode is standing by, not missing', () => {
+  const seen = INITIAL_TIME / 1000 - 3;
+  const a10 = { worker_name: 'LONG5060-1', online: true, state: 'idle', last_seen_at: seen };
+  const gpu = { worker_name: '5060TI-1', online: false, state: 'idle', last_seen_at: seen - 56000 };
+  const other = { worker_name: '5070TI-1', online: false, state: 'idle', last_seen_at: seen - 600 };
+  const workers = [gpu, other, a10];
+  const shared = sharedHost('5060TI-1', workers);
+  assert.deepEqual(shared, { host: '5060 Ti 16G（long5060-1）', mode: 'A1–A8 出圖', activeMode: 'A10 建模' });
+  const silent = workerPresentation(gpu, INITIAL_TIME, shared);
+  assert.equal(silent.status, '待用');
+  assert.equal(silent.statusNote, '本機目前為A10 建模模式');
+  assert.equal(silent.tone, 'neutral');
+  assert.match(silent.host, /同一台主機：5060 Ti 16G.*負責A1–A8 出圖/);
+  const active = workerPresentation(a10, INITIAL_TIME, sharedHost('LONG5060-1', workers));
+  assert.equal(active.status, '待命'); assert.equal(active.tone, 'ok');
+  // A different PC that is silent stays an error, and has no shared-host line.
+  assert.equal(sharedHost('5070TI-1', workers), null);
+  assert.equal(workerPresentation(other, INITIAL_TIME, null).status, '未回報');
+  assert.equal(workerPresentation(other, INITIAL_TIME, null).host, '');
+  // Both names of the shared PC silent: the PC is really missing.
+  const bothDown = [gpu, { ...a10, online: false }];
+  assert.equal(workerPresentation(gpu, INITIAL_TIME, sharedHost('5060TI-1', bothDown)).status, '未回報');
+  assert.equal(workerPresentation(gpu, INITIAL_TIME, sharedHost('5060TI-1', bothDown)).tone, 'error');
+  // Rows of one PC are kept together where the first of them appears.
+  assert.deepEqual(orderWorkers(workers).map(worker => worker.worker_name), ['5060TI-1', 'LONG5060-1', '5070TI-1']);
+});
+
 class Element extends EventTarget {
   constructor(tag) { super(); this.tagName = tag.toUpperCase(); this.children = []; this.dataset = {}; this.attributes = {}; this.hidden = false; this.disabled = false; this._text = ''; }
   set textContent(value) { this._text = String(value); this.children = []; }
@@ -237,6 +264,26 @@ test('DOM rendering treats hostile worker fields as text and hides stale normal 
   workerFailure = true; await controller.refresh();
   assert.ok(host.textContent.includes('已隱藏過期的正常標示'));
   assert.equal(host.textContent.includes(hostile), false);
+});
+
+test('rendered table shows the shared PC as standing by and keeps its rows together', async t => {
+  const previousFetch = globalThis.fetch;
+  const documentRef = new DocumentFixture(), host = documentRef.createElement('section'), dialog = { open: true };
+  const seen = INITIAL_TIME / 1000;
+  globalThis.fetch = async url => response(url.endsWith('/workers') ? { workers: [
+    { worker_name: '5060TI-1', online: false, state: 'idle', last_seen_at: seen - 56000, supported_systems: ['A1-1'], current_job_id: '' },
+    { worker_name: '5070TI-1', online: true, state: 'idle', last_seen_at: seen, supported_systems: ['A1-1'], current_job_id: '' },
+    { worker_name: 'LONG5060-1', online: true, state: 'idle', last_seen_at: seen, supported_systems: ['A10_V1'], current_job_id: '' },
+  ] } : payload(url));
+  const controller = mountMonitor(host, { readContext: () => ({ allowed: true, token: 'fixture-token', identity: 'fixture@example.invalid', base: 'https://fixture.invalid' }), dialog, documentRef });
+  t.after(() => { controller.stop(); globalThis.fetch = previousFetch; });
+  await controller.start();
+  const text = host.textContent;
+  assert.ok(text.includes('待用本機目前為A10 建模模式'));
+  assert.ok(text.includes('同一台主機：5060 Ti 16G（long5060-1），此名稱負責A10 建模'));
+  assert.ok(text.indexOf('5060TI-1') < text.indexOf('LONG5060-1') && text.indexOf('LONG5060-1') < text.indexOf('5070TI-1'));
+  const badges = documentRef.created.filter(node => node.className === 'monitor-badge');
+  assert.deepEqual(badges.map(node => node.dataset.tone), ['neutral', 'ok', 'ok']);
 });
 
 test('hidden page pauses and returning to a closed dialog does not restart requests', async t => {
