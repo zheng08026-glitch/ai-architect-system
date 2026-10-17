@@ -906,6 +906,7 @@ function systemButton(system, { child = false, groupId = null } = {}) {
   button.disabled = system.status !== "Live System";
   button.setAttribute("aria-current", system.id === activeId ? "true" : "false");
   button.innerHTML = `
+    ${child ? "" : systemIllustration(system.id, "sidebar-system-art")}
     <span class="system-id">${system.displayId || system.id}</span>
     <span><strong>${system.title}</strong><small>${system.subtitle}</small></span>
     <span class="tier-chip">${system.tier}</span>
@@ -938,6 +939,7 @@ function sidebarGroup(group) {
   toggle.setAttribute("aria-expanded", String(isExpanded));
   toggle.setAttribute("aria-controls", `sidebar-${group.id}-children`);
   toggle.innerHTML = `
+    ${systemIllustration(group.id, "sidebar-system-art")}
     <span class="system-id">${group.id}</span>
     <span class="system-group-copy">
       <strong>${group.title}</strong>
@@ -973,6 +975,57 @@ function renderSystemList() {
   sidebarGroups.forEach((group) => systemList.append(sidebarGroup(group)));
 }
 
+// Display the user's original artwork without redrawing it. Coordinates are in
+// the unmodified 1280 x 720 reference JPG; clips exclude adjacent UI text/buttons.
+const systemArtworkCrops = {
+  A1: { box: [72, 289, 180, 74] },
+  A2: { box: [338, 270, 166, 110], clip: "375,270 504,270 504,363 469,363 469,367 416,367 416,380 405,380 405,367 338,367 338,284 375,284" },
+  A3: { box: [549, 289, 194, 74] },
+  A4: { box: [798, 276, 176, 96], clip: "878,276 974,276 974,363 941,363 941,372 798,372 798,286 878,286" },
+  A5: { box: [1065, 267, 162, 114], clip: "1100,267 1227,267 1227,363 1192,363 1192,381 1065,381 1065,283 1100,283" },
+  A6: { box: [82, 508, 167, 125], clip: "140,508 249,508 249,633 82,633 82,525 140,525" },
+  A7: { box: [335, 511, 162, 115], clip: "375,511 497,511 497,626 335,626 335,526 375,526" },
+  A8: { box: [577, 525, 157, 104] },
+  A9: { box: [791, 529, 190, 90] },
+  A10: { box: [1039, 532, 194, 103], clip: "1039,532 1233,532 1233,621 1189,621 1189,635 1039,635" },
+};
+
+function systemIllustration(systemId, className) {
+  const familyId = systemId.match(/^A\d+/)?.[0] || "A1";
+  const crop = systemArtworkCrops[familyId] || systemArtworkCrops.A1;
+  const clipId = `artwork-${familyId}-${className}`;
+  const [x, y, width, height] = crop.box;
+  return `<svg class="${className}" viewBox="${crop.box.join(" ")}" width="200" height="120" aria-hidden="true" focusable="false" overflow="hidden">
+    <defs><clipPath id="${clipId}">${crop.clip ? `<polygon points="${crop.clip}" />` : `<rect x="${x}" y="${y}" width="${width}" height="${height}" />`}</clipPath></defs>
+    <image href="./assets/system-icons/reference-22962.jpg" width="1280" height="720" clip-path="url(#${clipId})" />
+  </svg>`;
+}
+
+function renderSystemTabs(system) {
+  const tabs = document.getElementById("systemTabs");
+  const group = sidebarGroups.find((item) => sidebarGroupContains(item, system.id));
+  const children = (group?.childIds || []).map(getSystem).filter((item) => item?.status === "Live System");
+  tabs.replaceChildren();
+  tabs.hidden = children.length < 2;
+  children.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "system-tab";
+    button.dataset.systemTab = item.id;
+    button.setAttribute("aria-current", item.id === system.id ? "page" : "false");
+    const label = item.id === "A1-1" ? "白話文" : item.id === "A1-2" ? "文言文" : item.subtitle;
+    button.textContent = `${item.displayId || item.id} ${label}`;
+    button.addEventListener("click", () => {
+      if (item.id === activeId) return;
+      activateSystem(item.id, group.id);
+      tabs.querySelector(`[data-system-tab="${item.id}"]`)?.focus({ preventScroll: true });
+    });
+    tabs.append(button);
+  });
+  const art = document.getElementById("activeSystemArt");
+  art.innerHTML = systemIllustration(system.id, "active-system-source");
+}
+
 function systemCard(system) {
   const card = document.createElement("button");
   card.type = "button";
@@ -985,6 +1038,7 @@ function systemCard(system) {
     </div>
     <h3>${system.title}</h3>
     <p>${system.subtitle}</p>
+    ${systemIllustration(system.id, "system-card-art")}
     <div class="system-meta">
       <span class="tier-chip">${system.tier}</span>
       <span class="card-arrow">→</span>
@@ -2466,6 +2520,7 @@ function renderApp() {
   const system = getActiveSystem();
 
   renderSystemList();
+  renderSystemTabs(system);
 
   systemsGrid.innerHTML = "";
   gridSystems.forEach((item) => systemsGrid.append(systemCard(item)));

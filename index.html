@@ -15,6 +15,7 @@
     <meta name="theme-color" content="#050711" />
     <link rel="manifest" href="./site.webmanifest" />
     <link rel="stylesheet" href="./styles.css?v=member-records-20261014-r1" />
+    <link rel="stylesheet" href="./systems-ui.css?v=original-artwork-20261017" />
   </head>
   <body>
     <div class="site-shell">
@@ -100,7 +101,8 @@
 
             <section class="tool-panel" aria-live="polite">
               <div class="tool-header">
-                <div>
+                <div class="active-system-art" id="activeSystemArt" aria-hidden="true"></div>
+                <div class="tool-heading-copy">
                   <p class="panel-kicker" id="activeTier">Free</p>
                   <h3 id="activeTitle">A1 Prompt Basic</h3>
                   <p id="activeDesc">由建築量體圖判斷空間特徵，產生可延伸的英文建築提示詞。</p>
@@ -118,6 +120,8 @@
                   </button>
                 </div>
               </div>
+
+              <nav class="system-tabs" id="systemTabs" aria-label="系統子功能" hidden></nav>
 
               <div class="tool-body">
                 <form class="input-stack" id="inputStack"></form>
@@ -503,6 +507,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=member-usage-20260604"></script>
     <script src="./a2-3-editor.js?v=a23-progress-compare-20261012-r2"></script>
-    <script src="./app.js?v=a10site-20261015-dem2025"></script>
+    <script src="./app.js?v=original-artwork-20261017"></script>
   </body>
 </html>

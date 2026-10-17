@@ -13,6 +13,8 @@ const staticRuntimeFiles = [
   'admin-access.js',
   'admin.css',
   'styles.css',
+  'systems-ui.css',
+  'assets/system-icons',
   'a10-site',
   'a2-3-editor.js',
   'a2-3-editor.html',
