@@ -1,4 +1,4 @@
-import { mountSiteModel } from './main.js?v=20261015-dem2025';
+import { mountSiteModel } from './main.js?v=20261018-osmbusy';
 import { remoteAdapters } from './remote-adapters.js?v=20261015-dem2025';
 import publicConfig from './public-config.js?v=20261015-dem2025';
 

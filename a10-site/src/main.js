@@ -5,6 +5,8 @@ import { createGoogleServices } from './google-services.js';
 import { boundsFromCenter, measureBounds, validateBounds, buildRequest } from './domain.js';
 import { reliefCovered, RELIEF_COVERAGE_MESSAGE } from './terrain-coverage.js';
 
+export const OSM_BUSY_MESSAGE = '相關資訊網站維護中，請稍晚再來操作使用。本次不扣點數。';
+
 /** Mount into a root with index.html's component markup. State belongs to this instance only. */
 export async function mountSiteModel(root, { adapters = createHttpAdapters(), mapFactory = createLeafletMap, googleMapFactory = createGoogleMap, googleServicesFactory = createGoogleServices, onRequest } = {}) {
   const $ = id => root.querySelector(`#${id}`);
@@ -23,6 +25,8 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   const listeners = [];
   const listen = (element, event, handler) => { element.addEventListener(event, handler); listeners.push(() => element.removeEventListener(event, handler)); };
   const status = (id, message, tone = '') => { $(id).textContent = message; $(id).dataset.tone = tone; };
+  // The host's "外部資料服務忙碌" text (OpenStreetMap/Overpass unavailable) is shown to members in the owner's wording.
+  const failedMessage = job => /外部資料服務忙碌/.test(job.error?.message || '') ? OSM_BUSY_MESSAGE : `任務失敗：${job.error?.message || job.error?.code || '請稍後重試，或聯繫管理員。'}`;
   const number = value => new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(value);
   const defaultSourceDescription = $('model-source-description').textContent;
   const defaultPartialDescription = $('partial-consent-description').textContent;
@@ -209,7 +213,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       const job = await adapters.jobs.get(id);
       if (state.destroyed || id !== jobFlow.job?.id) return;
       jobFlow.job = job; jobFlow.failures = 0; jobFlow.coverage = job.coverage || jobFlow.coverage; showCoverage(jobFlow.coverage);
-      const messages = { queued: '任務已排隊，等待建模服務處理。', running: '正在取得資料並建立 SketchUp 模型；可保留此頁等候。', partial: '已產生部分成果，正在核對可下載檔案；樓高與地形等限制請查看成果報告。', succeeded: '建模已完成；只開放已驗證的實際檔案下載。', failed: `任務失敗：${job.error?.message || job.error?.code || '請稍後重試，或聯繫管理員。'}` };
+      const messages = { queued: '任務已排隊，等待建模服務處理。', running: '正在取得資料並建立 SketchUp 模型；可保留此頁等候。', partial: '已產生部分成果，正在核對可下載檔案；樓高與地形等限制請查看成果報告。', succeeded: '建模已完成；只開放已驗證的實際檔案下載。', failed: failedMessage(job) };
       status('job-status', messages[job.status] || '正在讀取任務狀態。', job.status === 'failed' ? 'error' : job.status === 'partial' ? 'warning' : '');
       $('job-stage').textContent = job.queue_position ? `共同佇列：第 ${job.queue_position} 位（A10-V1／A10-Site）` : '';
       if (['partial', 'succeeded'].includes(job.status)) {

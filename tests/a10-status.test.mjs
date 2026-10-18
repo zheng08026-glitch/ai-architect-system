@@ -288,6 +288,17 @@ test('member-history failure text is sanitized before the task is opened',()=>{
   assert.match(message,/系統錯誤/);assert.doesNotMatch(message,/secret|Traceback|192\.0\.2/);
 });
 
+test('A10-Site OpenStreetMap outage shows the owner wording in member history; other Site errors unchanged',()=>{
+  const f=fixture(()=>{});
+  const busy='任務未完成：系統錯誤（外部資料服務忙碌）。OpenStreetMap 建物與道路資料服務暫時無法回應，本次未產生成果、不扣點數；請稍後再試。';
+  const site=(public_error,system_id='A10_SITE')=>f.run(`getPublicJobError(${JSON.stringify({job_id:'s1',system_id,status:'failed',public_error})})`);
+  assert.equal(site(busy),'相關資訊網站維護中，請稍晚再來操作使用。本次不扣點數。');
+  const input='任務未完成：輸入錯誤。範圍上限為寬、深各 2000 公尺，請縮小範圍後再送出。';
+  assert.equal(site(input),input);
+  assert.equal(site('任務未完成：系統錯誤。系統已保留紀錄，請稍後再試或聯絡管理員。'),'任務未完成：系統錯誤。系統已保留紀錄，請稍後再試或聯絡管理員。');
+  assert.notEqual(site(busy,'A1'),'相關資訊網站維護中，請稍晚再來操作使用。本次不扣點數。');
+});
+
 for(const change of ['file','exterior','mode']){
   test(`${change} change prevents a late old failure from replacing the new view`,async()=>{
     let release;

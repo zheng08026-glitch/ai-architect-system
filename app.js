@@ -340,7 +340,7 @@ function renderSiteEditor(system) {
   }
   host = document.createElement('div'); host.id = 'a10SiteHost'; panel.append(host);
   host.textContent = '正在載入 A10-Site 工作區…';
-  siteEditorPromise = import('./a10-site/src/embedded.js?v=20261015-dem2025').then(async editor => {
+  siteEditorPromise = import('./a10-site/src/embedded.js?v=20261018-osmbusy').then(async editor => {
     host.textContent = '';
     return editor.mount(host, {
       apiBase: getApiBase, token: getAuthToken, email: getAuthEmail,
@@ -616,6 +616,10 @@ function getPublicJobError(job = {}) {
   if (!rawMessage && job.status !== "failed") return "";
   if (job.system_id === "A2-3") {
     return job.error_type === "input" ? PUBLIC_INPUT_JOB_ERROR_MESSAGE : PUBLIC_SYSTEM_JOB_ERROR_MESSAGE;
+  }
+  // A10-Site's OpenStreetMap/Overpass outage text, in the owner's wording (same as a10-site/src/main.js).
+  if (job.system_id === "A10_SITE" && publicMessage.includes("外部資料服務忙碌")) {
+    return "相關資訊網站維護中，請稍晚再來操作使用。本次不扣點數。";
   }
   if (publicMessage.includes("輸入錯誤") || publicMessage.includes("系統錯誤")) {
     return publicMessage;
