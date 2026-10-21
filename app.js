@@ -2,6 +2,9 @@
 const a23LocalTest = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
   && new URLSearchParams(location.search).get("a2_3_test") === "1";
 const a23EntryEnabled = window.ARCHITECT_AI_A2_3_ENABLED === true || a23LocalTest;
+const a2Plus = window.AIAS_A2_PLUS;
+const a2PlusEntryEnabled = window.ARCHITECT_AI_A2_PLUS_ENABLED === true || (["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).get("a2_plus_test") === "1");
+const isA2Plus = system => Boolean(a2Plus?.presets[system.id]);
 const systems = [
   {
     id: "A1-1",
@@ -254,6 +257,14 @@ if (a23EntryEnabled) systems.push({
   count: false, prompt: true,
 });
 
+// Candidate entries preserve existing systems and use separate workflow IDs.
+if (a2Plus) Object.entries(a2Plus.presets).forEach(([id, p]) => {
+  systems.push({id, displayId: p.label, activeTitle: `${p.label}｜One-Click Rendering`,
+    title: 'One-Click Rendering', subtitle: p.floor ? '新風格平面上色' : id.endsWith('PRECISE') ? '精準構圖・可編輯光線與材質' : '可編輯光線與材質',
+    desc: p.floor ? '選擇新風格並編輯提詞，保留 AI 原始上色與線稿疊回成果。' : '上傳圖片、選擇光線並編輯共用規則、材質與攝影語言，完成後與原圖比較。',
+    tier: '會員', status: 'Live System', result: 'image', inputs: [{key: 'image', label: p.floor ? '平面圖線稿' : '手繪圖 / 3D 線稿'}], count: false, prompt: false});
+});
+
 const legacyA10 = systems.find(s => s.id === "A10");
 Object.assign(legacyA10, {title:"A10-Bata", displayId:"A10-Bata", activeTitle:"A10-Bata｜2D TO 3D"});
 systems.push({...legacyA10,id:"A10_V1",displayId:"A10-v1",title:"A10-v1",activeTitle:"A10-v1｜2D TO 3D",desc:"上傳 DXF，選擇樓板、建築量體、外牆或外牆含室內隔間。"});
@@ -320,6 +331,7 @@ gridSystems.push({...systems.find((system) => system.id === "A10_V1"), targetId:
 systems.push({...legacyA10,id:"A10_SITE",status:"Live System",subtitle:"基地模型・SKP 2019",displayId:"A10-Site",title:"A10-Site",activeTitle:"A10-Site｜基地模型",desc:"框選基地，生成地形、街廓與建築示意模型。",tier:"全功能開通",result:"site"});
 sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF／基地 → SketchUp",childIds:["A10_V1","A10_SITE"]});
 
+if (a2PlusEntryEnabled && a2Plus) sidebarGroups.find(group => group.id === "A2").childIds = ["A2-1", "A2-1-PLUS", "A2-1-PLUS-PRECISE", "A2-2", "A2-2-PLUS"];
 if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
 
 let activeId = a23LocalTest ? "A2-3" : "A1-1";
@@ -614,7 +626,7 @@ function getPublicJobError(job = {}) {
   const rawMessage = String(job.public_error || job.error || "");
   const publicMessage = String(job.public_error || "");
   if (!rawMessage && job.status !== "failed") return "";
-  if (job.system_id === "A2-3") {
+  if (["A2-3", "A2-1-PLUS", "A2-1-PLUS-PRECISE", "A2-2-PLUS"].includes(job.system_id)) {
     return job.error_type === "input" ? PUBLIC_INPUT_JOB_ERROR_MESSAGE : PUBLIC_SYSTEM_JOB_ERROR_MESSAGE;
   }
   // A10-Site's OpenStreetMap/Overpass outage text, in the owner's wording (same as a10-site/src/main.js).
@@ -750,7 +762,7 @@ function renderJobList(records = []) {
       const errorMessage = getPublicJobError(job);
       return `
         <div class="record-item" data-job-index="${index}" ${index >= 10 ? "hidden" : ""}>
-          <strong>${escapeHtml(job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
+          <strong>${escapeHtml(a2Plus?.presets[job.system_id]?.label || job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
           <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}</small>
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
@@ -760,7 +772,7 @@ function renderJobList(records = []) {
                 : ""
             }
             ${
-              downloadUrl && job.system_id !== "A2-3"
+              downloadUrl && job.system_id !== "A2-3" && !isA2Plus({id: job.system_id})
                 ? `<a class="text-button" href="${escapeHtml(downloadUrl)}" download target="_blank" rel="noreferrer">下載</a>`
                 : ""
             }
@@ -1924,7 +1936,8 @@ function renderHowToUse(system) {
 
   const guideSrc = OPERATION_GUIDES[system.id];
   const isA10 = system.id === "A10";
-  const hasGuide = Boolean(guideSrc || isA10);
+  const isPlus = isA2Plus(system);
+  const hasGuide = Boolean(guideSrc || isA10 || isPlus);
   const isVisible = Boolean(hasGuide && isHowToUseOpen);
   howToUseButton.hidden = !hasGuide;
   howToUseButton.setAttribute("aria-expanded", String(isVisible));
@@ -1949,10 +1962,18 @@ function renderHowToUse(system) {
     howToUsePopover.append(textGuide);
   }
   if (textGuide) textGuide.hidden = !isA10;
-  howToUseImage.hidden = isA10 || !guideSrc;
+  let plusGuide = document.getElementById("a2PlusHowToUse");
+  if (!plusGuide && isPlus) {
+    plusGuide = document.createElement("div"); plusGuide.id = "a2PlusHowToUse";
+    plusGuide.className = "a10-how-to-use";
+    plusGuide.innerHTML = '<p><strong>A2 + 操作說明</strong></p><ol><li>上傳圖片。</li><li>透視圖選光線；平面圖選更新版風格。所選提詞可直接修改。</li><li>檢查並修改 A 共用規則、B 材質、C 攝影語言。平面圖的材質與光線已包含在風格提詞內，B、C 可留空或補充。</li><li>選擇 1～6 張，按「AI生成圖說」。A2-2 + 每張包含 AI 原始上色及線稿疊回兩個檔案。</li><li>點選成果縮圖，用左右對照或疊圖滑桿比對原圖。「下載這張」下載選中成果；Save ZIP 下載全部。歷史成果可從會員中心重新開啟。</li></ol>';
+    howToUsePopover.append(plusGuide);
+  }
+  if (plusGuide) plusGuide.hidden = !isPlus;
+  howToUseImage.hidden = isA10 || isPlus || !guideSrc;
   if (!hasGuide) return;
 
-  const guideTitle = `${system.id} How To Use / 如何使用`;
+  const guideTitle = `${system.displayId || system.id} How To Use / 如何使用`;
   howToUseTitle.textContent = guideTitle;
   if (guideSrc) howToUseImage.src = guideSrc;
   howToUseImage.alt = guideTitle;
@@ -1963,7 +1984,27 @@ function toggleHowToUse() {
   renderHowToUse(getActiveSystem());
 }
 
+function a2PlusContext(system) {
+  return {
+    base: getApiBase, token: getAuthToken, main: mainPreview, thumbs: thumbGrid,
+    login: () => { authMessage.textContent = "請先登入會員後使用。"; authDialog.showModal(); },
+    error: message => showResultMessage(system, message),
+    progress: job => renderJobProgress(system, job), refresh: loadMemberCenter,
+    results: job => { activeResultJobId = job.job_id; return a2Plus.showResults(system.id, job, a2PlusContext(system)); },
+    select: (url, index, images) => {
+      activeResultUrl = url; activeResultType = "image"; activeResultIndex = index;
+      activeResultUrls = images; activeResultOriginalUrls = images;
+      prepareResultBlob(url, index); updateDownloadButtonForResults(system);
+    },
+  };
+}
+
 function renderInputs(system) {
+  if (isA2Plus(system)) {
+    a2Plus.renderInputs(system.id, inputStack, uploadField(system.inputs[0]),
+      button => a2Plus.submit(system.id, uploadedFiles.get(`${system.id}-image`), a2PlusContext(system), button));
+    return;
+  }
   if(system.id === "A10") {
     inputStack.classList.remove("multi-image-inputs");
     inputStack.innerHTML = '<p class="generation-notice">A10-Bata 已停止接受新任務。此頁僅供查看與下載既有成果。</p><button type="button" class="text-button" data-open-a10-v1>前往 A10-v1</button>';
@@ -2290,6 +2331,7 @@ function setVideoResults(videoUrls, system = getActiveSystem(), jobId = activeRe
 
 function setJobResults(system, job) {
   activeResultJobId = job.job_id || "";
+  if (isA2Plus(system)) return a2Plus.showResults(system.id, job, a2PlusContext(system));
   if (["A10","A10_V1"].includes(system.id)) return setA10Result(job);
   if (system.result === "video") {
     setVideoResults(job.output_videos || (job.output_video ? [job.output_video] : []), system, activeResultJobId);
@@ -2540,7 +2582,9 @@ function simulateGenerate() {
 }
 
 function renderApp() {
+  a2Plus?.resetView();
   const system = getActiveSystem();
+  document.querySelector(".tool-panel").classList.toggle("a2plus-active", isA2Plus(system));
 
   renderSystemList();
   renderSystemTabs(system);
@@ -2740,6 +2784,7 @@ async function fetchServerZipBlob() {
 
   const response = await fetch(`${apiBase}/api/jobs/${encodeURIComponent(activeResultJobId)}/outputs.zip`, {
     cache: "no-store",
+    ...(isA2Plus(getActiveSystem()) ? {headers: getAuthHeaders()} : {}),
   });
   if (!response.ok) {
     throw new Error(`API ZIP download failed: ${response.status}`);

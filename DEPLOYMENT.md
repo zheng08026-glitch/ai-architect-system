@@ -176,3 +176,19 @@ UM760 由排程 `AIAS_Dispatch_Service` 在互動登入階段啟動，透過既�
 後台沿用同源 Supabase 登入，另以 `/api/member/profile` 驗證管理員身分後才載入會員與主機資料。不在網址或 opener 傳遞憑證；登出、換帳號及伺服器拒絕授權會撤下資料，晚到的舊回覆不能還原。全功能開通仍由既有擁有者專用端點驗證。
 
 監控使用現有 health、admin/workers 與 admin/overview API，顯示服務連線、排單數量、工作程式回報與目前任務；工作程式有回報不代表 GPU、SketchUp 或任務進度均正常。本次是前端發布，不需要重啟 UM760 或 GPU Worker。Vite 會攜帶獨立後台 HTML、CSS、模組及共用樣式，`npm run build` 包含管理權限與監控回歸測試。
+
+## A2 Plus 發布（2026-10-21）
+
+發布前基線為遠端與正式網站已核對的 c4827c1。新增入口按以下順序排列，保留原項目：A2-1 → A2-1 + → A2-1 +精準版 → A2-2 → A2-2 + → A2-3。對應新 ID 為 A2-1-PLUS、A2-1-PLUS-PRECISE、A2-2-PLUS。
+
+發布前已完成受影響 GPU 的真實生成驗收與新能力登錄核對，UM760 已部署 A2 Plus 並啟用新送件，原有 A10 設定及維護控制保持不變。前端已通過 75 項既有測試與正式建置；這些檢查不代表正式會員端完整流程已驗收，仍須在網站發布後檢查送件、成果比較、歷史及下載。
+
+操作為上傳圖片、選擇光線（平面版選新風格）、修改選項提詞及 A 共用規則／B 材質／C 攝影語言、選 1～6 張、AI生成圖說。A2-2 + 只含現代暖木、北歐白、日式原木、輕奢大理石；風格已含材質與光線，B/C 預設留空供補充。每張保留 AI 原始上色與線稿疊回兩個檔案。成果支援左右／疊圖對照、單張下載與整批 ZIP，歷史成果也可取回原圖比較。
+
+三個部署面須分開更新：
+
+1. 受影響 GPU：先比對現行 worker.py，合併 hook；包含 a2_plus_worker.py、其匯入的 a2_3_worker.py、三個 A2_*plus*.json 及 requirements-a2_plus.txt。以 verify_a2_plus.py 驗證該機即時 schema、模型及 Python 匯入，再逐項做實際生成。只將驗收項目加入該機 AIA_A2_PLUS_SYSTEMS，保留既有 worker 身分、A2-3 opt-in 與能力清單。增量安裝包會核對原啟動 BAT 呼叫鏈及實際工作流目錄，備份後在同一個 leaf 加入已驗收能力與啟動檢查；仍從原本外層 BAT 啟動，不用套件 BAT 取代主機入口。a2_plus_launch_guard.ps1 與 a2_plus_startup_probe.py 必須和該 hook 一起保留，以原本 worker 選定的 Python 及有效環境再次檢查。正常啟動後還須核對最新 heartbeat，不能只以 INSTALL_OK 判定可以派工。
+2. UM760：更新已與現行主機整合的 app.py 和 a2_plus.py，確認 a10.py、a10_v1.py、a2_3.py、a10_site.py、full_access.py、shared_queue.py 及 Pillow 均齊備。先核對目前主機 hash，保留環境與會員帳冊，完成隔離匯入及既有功能驗證。正式啟用設 AIA_A2_PLUS_ENABLED=1；停用只關閉新送件，歷史授權存取仍保留。維護及服務重新啟動須另行安排。
+3. Cloudflare Pages：config.js 的 ARCHITECT_AI_A2_PLUS_ENABLED 設為 true，index.html 的 config.js 查詢版本同步更新為 a2-plus-20261021。只有 UM760 正式啟用及已驗收 worker 最新能力登錄均確認後才能發布。執行 node --check app.js、node --check a2-plus.js 及 npm run build -- --configLoader native，再依核准的發布安排 commit/push。vite 同時複製 a2-plus.js、a2-plus-presets.js、a2-plus.css。正式會員送件、額度、排隊、兩種成果及歷史下載仍需上線驗收。
+
+本機可用 /?a2_plus_test=1#workspace 查看候選入口；此參數不會略過 dispatch 身分與啟用檢查。只有本機 fixture 測試服務使用隔離測試帳號與示意成果。穩定運作後是否替代舊項目須再決定，本次不刪除、不自動停用任何既有工作項目。
