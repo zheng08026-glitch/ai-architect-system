@@ -58,7 +58,7 @@ window.AIAS_A2_PLUS = (() => {
     for (const n of [1, 6]) { const option = el('option', `${n} 張`); option.value = n; count.append(option); }
     count.value = draft.count; count.addEventListener('change', () => { draft.count = Number(count.value); });
     countBox.append(countLabel, count);
-    if (p.floor) countBox.append(el('small', '每張生成各保留「AI 原始上色」與「線稿疊回版」；選 1 張共 2 個檔案，選 6 張共 12 個檔案。'));
+    if (p.floor) countBox.append(el('small', '每張成果可查看「AI 原始上色」與「線稿疊回版」。'));
     parent.append(countBox, el('h3', '5. 送出資訊', 'a2plus-step'));
     const button = el('button', 'AI生成圖說', 'generate-button'); button.type = 'button'; button.addEventListener('click', () => submit(button));
     parent.append(button, el('p', '每次送出使用 A1–A8 共用額度 1 次。AI 成果可能有錯誤或變形，請比對原圖後使用。', 'generation-notice'));
