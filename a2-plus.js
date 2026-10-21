@@ -5,12 +5,25 @@ window.AIAS_A2_PLUS = (() => {
   let revision = 0;
   let urls = [];
   let controller;
+  let resultRevision = 0;
+  let viewContext;
+  let viewOwner = '';
+  function clearComparison() {
+    const host = document.getElementById('a2PlusResults');
+    if (host) { host.hidden = true; host.replaceChildren(); }
+  }
   function resetView() {
     revision += 1;
+    resultRevision += 1;
     controller?.abort();
+    clearComparison();
+    viewContext?.clear();
+    viewContext = undefined;
+    viewOwner = '';
     urls.forEach(url => URL.revokeObjectURL(url));
     urls = [];
   }
+  function refreshAccess(owner) { if (viewOwner && viewOwner !== owner) resetView(); }
   function state(id) {
     if (!drafts.has(id)) {
       const p = presets[id];
@@ -93,6 +106,9 @@ window.AIAS_A2_PLUS = (() => {
     if (!file) { context.error('請先上傳圖片。'); return; }
     const draft = state(id);
     if (!draft.rules.trim() || !draft.texts[draft.preset - 1].trim()) { context.error('請填寫共用規則及光線／風格提詞。'); return; }
+    resetView();
+    viewContext = context; viewOwner = context.owner();
+    context.clear();
     const version = revision, token = context.token();
     const current = () => revision === version && context.token() === token;
     const abort = new AbortController(); controller = abort;
@@ -129,8 +145,12 @@ window.AIAS_A2_PLUS = (() => {
     } finally { if (current()) button.disabled = false; }
   }
   async function showResults(id, job, context) {
-    const version = revision, token = context.token();
-    const current = () => revision === version && token === context.token();
+    const version = revision, resultVersion = ++resultRevision, token = context.token();
+    const owner = context.owner();
+    const viewCurrent = () => revision === version && resultVersion === resultRevision && owner === context.owner();
+    const current = () => viewCurrent() && token === context.token();
+    clearComparison();
+    viewContext = context; viewOwner = context.owner();
     const created = [];
     try {
       const get = async path => {
@@ -146,44 +166,105 @@ window.AIAS_A2_PLUS = (() => {
       for (let index = 0; index < record.output_images.length; index++) images.push(await get(`/api/a2-plus/jobs/${job.job_id}/images/${index}`));
       if (!current()) { created.forEach(url => URL.revokeObjectURL(url)); return; }
       if (!images.length) throw new Error('任務完成，但沒有收到可顯示的成果。');
-      urls.forEach(url => URL.revokeObjectURL(url)); urls = created;
       const p = presets[id], batch = Number(record.count) || (p.floor ? images.length / 2 : images.length);
+      if (!Number.isInteger(batch) || batch < 1 || images.length !== batch * (p.floor ? 2 : 1)) throw new Error('成果暫時無法完整顯示，請從任務紀錄重試。');
       const labels = images.map((_, i) => p.floor ? `${i < batch ? 'AI 原始上色' : '線稿疊回版'} ${i % batch + 1}` : `成果 ${i + 1}`);
-      const host = context.main, thumbs = context.thumbs;
-      host.replaceChildren(); thumbs.replaceChildren();
-      const viewer = el('div', '', 'a2plus-viewer');
-      const toolbar = el('div', '', 'a2plus-compare-toolbar');
-      const sideButton = el('button', '左右對照', 'text-button'), overlayButton = el('button', '疊圖對照', 'text-button');
-      sideButton.type = overlayButton.type = 'button'; toolbar.append(sideButton, overlayButton);
-      const download = el('a', '下載這張', 'text-button');
-      const selectDownload = i => { download.href = images[i]; download.download = `${p.label}-${labels[i]}.png`; };
-      selectDownload(0); toolbar.append(download);
-      const caption = el('p', labels[0]);
+      const originalImage = el('img'); originalImage.src = original;
+      try { await originalImage.decode(); } catch { throw new Error('原圖暫時無法顯示，請從任務紀錄重試。'); }
+      if (!current()) { created.forEach(url => URL.revokeObjectURL(url)); return; }
+      urls.forEach(url => URL.revokeObjectURL(url)); urls = created;
+      const host = context.comparison;
+      const viewer = el('section', '', 'a2plus-viewer'); viewer.setAttribute('aria-label', `${p.label} 任務結果`);
+      const toolbar = el('div', '', 'a2plus-result-heading');
+      const heading = el('h3', '原圖與最終成果');
+      const task = el('span', `任務 ${record.job_id || job.job_id}`, 'a2plus-job-id');
+      const toggle = el('button', '切換疊圖比對', 'a2plus-button'); toggle.type = 'button';
+      toolbar.append(heading, task, toggle);
+      const selection = el('div', '', 'a2plus-result-selection');
+      const picker = el('div', '', 'a2plus-result-picker'); picker.setAttribute('role', 'group'); picker.setAttribute('aria-label', '選擇成果');
+      picker.hidden = batch === 1;
+      let selectedResult = 0, selectedVariant = 0, comparisonMode = 'side';
+      const resultButtons = [];
+      for (let i = 0; i < batch; i++) {
+        const button = el('button', '', 'a2plus-result-choice'); button.type = 'button';
+        const image = el('img'); image.src = images[i]; image.alt = ''; image.loading = 'lazy';
+        button.append(image, el('span', `成果 ${i + 1}`));
+        button.addEventListener('click', () => { selectedResult = i; selectResult(); });
+        resultButtons.push(button); picker.append(button);
+      }
+      const versions = el('div', '', 'a2plus-version-picker'); versions.setAttribute('role', 'group'); versions.setAttribute('aria-label', '成果版本');
+      const versionButtons = p.floor ? ['AI 原始上色', '線稿疊回版'].map((label, i) => {
+        const button = el('button', label, 'a2plus-button'); button.type = 'button';
+        button.addEventListener('click', () => { selectedVariant = i; selectResult(); });
+        versions.append(button); return button;
+      }) : [];
+      versions.hidden = !p.floor;
+      selection.hidden = batch === 1 && !p.floor; selection.append(picker, versions);
       const side = el('div', '', 'a2plus-side');
-      function panel(label, src) { const figure = el('figure'); const image = el('img'); image.src = src; image.alt = label; figure.append(image, el('figcaption', label)); return figure; }
-      const before = panel('原圖', original), after = panel(labels[0], images[0]); side.append(before, after);
-      const overlay = el('div', '', 'a2plus-overlay');
-      const overlayBefore = el('img'); overlayBefore.src = original; overlayBefore.alt = '原圖';
-      const overlayAfter = el('img'); overlayAfter.src = images[0]; overlayAfter.alt = '生成成果';
-      overlayAfter.className = 'a2plus-overlay-after'; const line = el('div', '', 'a2plus-divider');
-      overlay.append(overlayBefore, overlayAfter, line);
-      const slider = el('input'); slider.type = 'range'; slider.min = 0; slider.max = 100; slider.value = 50; slider.setAttribute('aria-label', '原圖與成果疊圖比例');
-      const position = el('p', '原圖 50% ／ 成果 50%', 'a2plus-position');
-      slider.addEventListener('input', () => { overlay.style.setProperty('--position', `${slider.value}%`); position.textContent = `原圖 ${slider.value}% ／ 成果 ${100 - Number(slider.value)}%`; });
-      function mode(value) { const isSide = value === 'side'; side.hidden = !isSide; overlay.hidden = isSide; slider.hidden = isSide; position.hidden = isSide; sideButton.setAttribute('aria-pressed', String(isSide)); overlayButton.setAttribute('aria-pressed', String(!isSide)); }
-      sideButton.onclick = () => mode('side'); overlayButton.onclick = () => mode('overlay');
-      images.forEach((url, i) => {
-        const button = el('button'); button.type = 'button'; button.append(panel(labels[i], url));
-        button.addEventListener('click', () => {
-          after.querySelector('img').src = url; after.querySelector('img').alt = labels[i]; after.querySelector('figcaption').textContent = labels[i];
-          overlayAfter.src = url; caption.textContent = labels[i]; context.select(url, i, images);
-          selectDownload(i);
-          [...thumbs.children].forEach((child, j) => child.setAttribute('aria-pressed', String(i === j)));
+      function panel(label, src) { const figure = el('figure'); const image = el('img'); image.src = src; image.alt = label; figure.append(el('figcaption', label), image); return figure; }
+      const before = panel('本次送出的原圖', original), after = panel('最終成果', images[0]); side.append(before, after);
+      const overlay = el('div', '', 'a2plus-overlay-comparison');
+      const surface = el('div', '', 'a2plus-compare-surface');
+      const ratio = originalImage.naturalWidth / originalImage.naturalHeight;
+      surface.style.aspectRatio = `${originalImage.naturalWidth} / ${originalImage.naturalHeight}`;
+      surface.style.maxWidth = `min(1100px, calc(min(72vh, 720px) * ${ratio}))`;
+      const overlayAfter = el('img'); overlayAfter.src = images[0]; overlayAfter.alt = '最終成果疊圖'; overlayAfter.draggable = false;
+      const overlayBefore = el('img', '', 'a2plus-overlay-original'); overlayBefore.src = original; overlayBefore.alt = '本次送出的原圖疊圖'; overlayBefore.draggable = false;
+      const line = el('div', '', 'a2plus-divider'); line.setAttribute('aria-hidden', 'true');
+      const handle = el('span', '', 'a2plus-handle'); handle.append(el('span', '←'), el('span', '→')); line.append(handle);
+      const slider = el('input'); slider.type = 'range'; slider.min = 0; slider.max = 100; slider.step = 1; slider.value = 50;
+      slider.setAttribute('aria-label', '原圖與成果分隔位置');
+      const position = el('span', '', 'a2plus-position');
+      const caption = el('p', '', 'a2plus-compare-caption'); caption.append(el('span', '拖曳分隔線，查看同一位置的修改前後。'), position);
+      const originalLabel = el('span', '原始圖片', 'a2plus-compare-label original');
+      const finalLabel = el('span', '最終成果', 'a2plus-compare-label final');
+      surface.append(overlayAfter, overlayBefore, originalLabel, finalLabel, line, slider); overlay.append(surface, caption);
+      function setPosition() {
+        const value = Math.max(0, Math.min(100, Number(slider.value) || 0));
+        surface.style.setProperty('--position', `${value}%`);
+        position.textContent = `原圖 ${value}% ／ 成果 ${100 - value}%`;
+        slider.setAttribute('aria-valuetext', `原圖顯示 ${value}%，成果顯示 ${100 - value}%`);
+      }
+      slider.addEventListener('input', setPosition); setPosition();
+      function setMode(value) {
+        comparisonMode = value;
+        const isOverlay = value === 'overlay'; side.hidden = isOverlay; overlay.hidden = !isOverlay;
+        toggle.setAttribute('aria-pressed', String(isOverlay));
+        toggle.textContent = isOverlay ? '切換左右比對' : '切換疊圖比對';
+      }
+      toggle.addEventListener('click', () => setMode(comparisonMode === 'side' ? 'overlay' : 'side'));
+      const controls = el('div', '', 'a2plus-result-controls');
+      const download = el('a', '下載最終成果 PNG', 'a2plus-button a2plus-primary'); controls.append(download);
+      if (images.length > 1) {
+        const archive = el('button', '下載全部成果 ZIP', 'a2plus-button'); archive.type = 'button';
+        archive.addEventListener('click', async () => {
+          if (!viewCurrent()) return;
+          archive.disabled = true;
+          try { await context.downloadAll(archive, viewCurrent); if (viewCurrent()) archive.textContent = 'ZIP 已儲存'; }
+          catch (error) { if (viewCurrent()) archive.textContent = error?.name === 'AbortError' ? '已取消下載' : '下載未完成，請重試'; }
+          finally { if (viewCurrent()) { archive.disabled = false; setTimeout(() => { if (viewCurrent()) archive.textContent = '下載全部成果 ZIP'; }, 2400); } }
         });
-        button.setAttribute('aria-pressed', String(i === 0)); thumbs.append(button);
-      });
-      viewer.append(toolbar, caption, side, overlay, slider, position); host.append(viewer); mode('side'); context.select(images[0], 0, images);
+        controls.append(archive);
+      }
+      const preview = el('img', '', 'a2plus-selected-preview');
+      context.main.replaceChildren(preview); context.thumbs.replaceChildren();
+      const jump = el('button', '查看原圖與成果比對', 'a2plus-preview-jump'); jump.type = 'button';
+      const scrollToResults = () => host.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start'});
+      jump.addEventListener('click', scrollToResults); context.thumbs.append(jump);
+      function selectResult() {
+        const index = selectedResult + selectedVariant * batch, url = images[index], label = labels[index];
+        after.querySelector('img').src = url; after.querySelector('img').alt = label;
+        after.querySelector('figcaption').textContent = p.floor ? `最終成果・${label}` : batch > 1 ? `最終成果・${label}` : '最終成果';
+        overlayAfter.src = url; overlayAfter.alt = `${label}疊圖`; finalLabel.textContent = p.floor ? (selectedVariant ? '線稿疊回版' : 'AI 原始上色') : '最終成果';
+        preview.src = url; preview.alt = label;
+        download.href = url; download.download = `${p.label}-${label}.png`;
+        resultButtons.forEach((button, i) => { button.setAttribute('aria-pressed', String(i === selectedResult)); button.querySelector('img').src = images[i + selectedVariant * batch]; });
+        versionButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === selectedVariant)));
+        context.select(url, index, images);
+      }
+      viewer.append(toolbar, selection, side, overlay, controls); host.replaceChildren(viewer); host.hidden = false;
+      setMode('side'); selectResult(); scrollToResults();
     } catch (error) { created.forEach(url => URL.revokeObjectURL(url)); if (current()) context.error(error.message); }
   }
-  return {presets, renderInputs, submit, showResults, resetView};
+  return {presets, renderInputs, submit, showResults, resetView, refreshAccess};
 })();

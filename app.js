@@ -839,6 +839,7 @@ async function loadMemberCenter() {
 
 function updateAuthUi() {
   const email = getAuthEmail();
+  a2Plus?.refreshAccess(email);
   if (authButton) authButton.textContent = email ? "會員中心" : "登入";
   if (!email) setAdminVisible(false);
   setMemberCenterVisible(Boolean(email));
@@ -1967,7 +1968,7 @@ function renderHowToUse(system) {
   if (!plusGuide && isPlus) {
     plusGuide = document.createElement("div"); plusGuide.id = "a2PlusHowToUse";
     plusGuide.className = "a10-how-to-use";
-    plusGuide.innerHTML = '<p><strong>A2 + 操作說明</strong></p><ol><li>上傳圖片。</li><li>透視圖選光線；平面圖選更新版風格。所選提詞可直接修改。</li><li>檢查並修改 A 共用規則、B 材質、C 攝影語言。平面圖的材質與光線已包含在風格提詞內，B、C 可留空或補充。</li><li>選擇 1～6 張，按「AI生成圖說」。A2-2 + 每張包含 AI 原始上色及線稿疊回兩個檔案。</li><li>點選成果縮圖，用左右對照或疊圖滑桿比對原圖。「下載這張」下載選中成果；Save ZIP 下載全部。歷史成果可從會員中心重新開啟。</li></ol>';
+    plusGuide.innerHTML = '<p><strong>A2 + 操作說明</strong></p><ol><li>上傳圖片。</li><li>透視圖選光線；平面圖選更新版風格。所選提詞可直接修改。</li><li>檢查並修改 A 共用規則；透視圖另可修改 B 材質、C 攝影語言。平面圖的材質與光線已包含在風格提詞內。</li><li>選擇 1 張或 6 張（預設 1 張），按「AI生成圖說」。</li><li>完成後會顯示原圖與最終成果。點選成果縮圖換圖；A2-2 + 可切換「AI 原始上色」與「線稿疊回版」。按「切換疊圖比對」，拖曳分隔線查看同一位置的修改前後。</li><li>「下載最終成果 PNG」下載目前選擇的成果；「下載全部成果 ZIP」保留全部成果及版本。歷史成果可從會員中心重新開啟。</li></ol>';
     howToUsePopover.append(plusGuide);
   }
   if (plusGuide) plusGuide.hidden = !isPlus;
@@ -1987,7 +1988,9 @@ function toggleHowToUse() {
 
 function a2PlusContext(system) {
   return {
-    base: getApiBase, token: getAuthToken, main: mainPreview, thumbs: thumbGrid,
+    base: getApiBase, token: getAuthToken, owner: getAuthEmail, main: mainPreview, thumbs: thumbGrid,
+    comparison: $("#a2PlusResults"), clear: () => renderResult(system),
+    downloadAll: (button, isCurrent) => downloadImageZip(system, button, isCurrent),
     login: () => { authMessage.textContent = "請先登入會員後使用。"; authDialog.showModal(); },
     error: message => showResultMessage(system, message),
     progress: job => renderJobProgress(system, job), refresh: loadMemberCenter,
@@ -2894,12 +2897,15 @@ async function createStoredZip(files) {
   return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
 }
 
-async function downloadImageZip(system, button) {
-  if (activeResultUrls.length < 2) {
-    throw new Error(`ZIP 至少需要 2 張成果，目前收到 ${activeResultUrls.length} 張`);
+async function downloadImageZip(system, button, isCurrent = () => true) {
+  const ensureCurrent = () => { if (!isCurrent()) throw new DOMException("Result view changed", "AbortError"); };
+  ensureCurrent();
+  const resultUrls = [...activeResultUrls];
+  if (resultUrls.length < 2) {
+    throw new Error(`ZIP 至少需要 2 張成果，目前收到 ${resultUrls.length} 張`);
   }
 
-  const filename = `${publicSystemFileId(system)}-architect-ai-${activeResultUrls.length}-views.zip`;
+  const filename = `${publicSystemFileId(system)}-architect-ai-${resultUrls.length}-views.zip`;
   let zipBlob = null;
   try {
     button.textContent = "Preparing ZIP...";
@@ -2907,12 +2913,15 @@ async function downloadImageZip(system, button) {
   } catch {
     zipBlob = null;
   }
+  ensureCurrent();
 
   if (!zipBlob) {
     const files = [];
-    for (const [index, url] of activeResultUrls.entries()) {
-      button.textContent = `ZIP ${index + 1}/${activeResultUrls.length}`;
+    for (const [index, url] of resultUrls.entries()) {
+      ensureCurrent();
+      button.textContent = `ZIP ${index + 1}/${resultUrls.length}`;
       const blob = await fetchResultBlobWithRetry(url, index);
+      ensureCurrent();
       const extension = getBlobExtension(blob, url, "image");
       files.push({
         name: getResultFilename(system, index, extension, "image"),
@@ -2922,8 +2931,10 @@ async function downloadImageZip(system, button) {
     zipBlob = await createStoredZip(files);
   }
 
+  ensureCurrent();
   button.textContent = "Choose location...";
   const handle = await chooseSaveHandle(filename, "archive", "zip", "application/zip");
+  ensureCurrent();
   button.textContent = "Saving ZIP...";
   await saveBlob(zipBlob, handle);
 }
