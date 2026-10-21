@@ -260,6 +260,7 @@ if (a23EntryEnabled) systems.push({
 // Candidate entries preserve existing systems and use separate workflow IDs.
 if (a2Plus) Object.entries(a2Plus.presets).forEach(([id, p]) => {
   systems.push({id, displayId: p.label, activeTitle: `${p.label}｜One-Click Rendering`,
+    tabLabel: p.floor ? 'A2-2+' : id.endsWith('PRECISE') ? 'A2-1+精準版' : 'A2-1+可編輯',
     title: 'One-Click Rendering', subtitle: p.floor ? '新風格平面上色' : id.endsWith('PRECISE') ? '精準構圖・可編輯光線與材質' : '可編輯光線與材質',
     desc: p.floor ? '選擇新風格並編輯提詞，保留 AI 原始上色與線稿疊回成果。' : '上傳圖片、選擇光線並編輯共用規則、材質與攝影語言，完成後與原圖比較。',
     tier: '會員', status: 'Live System', result: 'image', inputs: [{key: 'image', label: p.floor ? '平面圖線稿' : '手繪圖 / 3D 線稿'}], count: false, prompt: false});
@@ -1049,7 +1050,7 @@ function renderSystemTabs(system) {
     button.dataset.systemTab = item.id;
     button.setAttribute("aria-current", item.id === system.id ? "page" : "false");
     const label = item.id === "A1-1" ? "白話文" : item.id === "A1-2" ? "文言文" : item.subtitle;
-    button.textContent = `${item.displayId || item.id} ${label}`;
+    button.textContent = item.tabLabel || `${item.displayId || item.id} ${label}`;
     button.addEventListener("click", () => {
       if (item.id === activeId) return;
       activateSystem(item.id, group.id);

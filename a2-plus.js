@@ -49,14 +49,16 @@ window.AIAS_A2_PLUS = (() => {
     select.addEventListener('change', () => { draft.preset = Number(select.value); area.value = draft.texts[draft.preset - 1]; });
     parent.append(el('h3', '3. 共用規則・目前提詞內容（可修改）', 'a2plus-step'));
     textarea(parent, 'A 共用規則', 'rules', draft.rules, value => { draft.rules = value; });
-    textarea(parent, 'B 材質', 'material', draft.material, value => { draft.material = value; }, p.floor ? '所選風格已包含材質設定；可在此補充。' : '依本次設計調整材質。');
-    textarea(parent, 'C 攝影語言', 'camera', draft.camera, value => { draft.camera = value; }, p.floor ? '共用規則已設定正交頂視；可在此補充呈現方式。' : '可調整鏡頭、質感與攝影描述。');
+    if (!p.floor) {
+      textarea(parent, 'B 材質', 'material', draft.material, value => { draft.material = value; }, '依本次設計調整材質。');
+      textarea(parent, 'C 攝影語言', 'camera', draft.camera, value => { draft.camera = value; }, '可調整鏡頭、質感與攝影描述。');
+    }
     const countBox = el('div', '', 'field-box'); const countLabel = el('label', '4. 輸出張數'); countLabel.htmlFor = 'a2plus-count';
     const count = el('select'); count.id = countLabel.htmlFor;
-    for (let n = 1; n <= 6; n++) { const option = el('option', `${n} 張`); option.value = n; count.append(option); }
+    for (const n of [1, 6]) { const option = el('option', `${n} 張`); option.value = n; count.append(option); }
     count.value = draft.count; count.addEventListener('change', () => { draft.count = Number(count.value); });
     countBox.append(countLabel, count);
-    if (p.floor) countBox.append(el('small', '每張生成各保留「AI 原始上色」與「線稿疊回版」，例如選 2 張會得到 2 組、共 4 個檔案。'));
+    if (p.floor) countBox.append(el('small', '每張生成各保留「AI 原始上色」與「線稿疊回版」；選 1 張共 2 個檔案，選 6 張共 12 個檔案。'));
     parent.append(countBox, el('h3', '5. 送出資訊', 'a2plus-step'));
     const button = el('button', 'AI生成圖說', 'generate-button'); button.type = 'button'; button.addEventListener('click', () => submit(button));
     parent.append(button, el('p', '每次送出使用 A1–A8 共用額度 1 次。AI 成果可能有錯誤或變形，請比對原圖後使用。', 'generation-notice'));
