@@ -97,7 +97,15 @@ export function createAdminAccess({ base, fetchImpl = fetch, onChange = () => {}
     const captured = capture(); emit();
     const work = (async () => {
       try {
-        const data = await send('/api/member/profile', {}, captured);
+        let data;
+        for (let attempt = 1; ; attempt++) {
+          try { data = await send('/api/member/profile', {}, captured); break; }
+          catch (error) {
+            // The profile check is a read: a busy server or a dropped connection gets one more try.
+            const transient = error?.timeout === true || error instanceof TypeError;
+            if (attempt >= 2 || !transient || !current(captured) || error?.stale) throw error;
+          }
+        }
         guard(captured);
         if (normalize(data?.email) !== captured.identity
           || !(data?.role === 'admin' || data?.is_primary_admin === true)

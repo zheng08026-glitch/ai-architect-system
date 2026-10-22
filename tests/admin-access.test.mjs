@@ -189,8 +189,26 @@ test('profile timeout settles without throwing and late body cannot emit ready',
 test('profile network failure never rejects setSession and can be explicitly rechecked', async () => {
   const f = fixture(() => Promise.reject(TypeError('network')));
   await assert.doesNotReject(f.access.setSession(session())); assert.equal(f.latest().status, 'error');
+  assert.equal(f.requests.length, 2);
   f.setPlan(() => response(admin()));
   await f.access.setSession(session()); assert.equal(f.latest().status, 'ready');
-  assert.equal(f.requests.length, 2);
+  assert.equal(f.requests.length, 3);
   f.access.invalidate();
+});
+
+test('profile check retries once after a timeout and then becomes ready', async () => {
+  const slow = deferred(); let calls = 0;
+  const f = fixture(() => (++calls === 1 ? slow.promise : response(admin())), 20);
+  await f.access.setSession(session());
+  assert.equal(f.latest().status, 'ready'); assert.equal(f.requests.length, 2);
+  assert.equal(f.requests[0].signal.aborted, true);
+  slow.resolve(response(admin('fixture-late@example.invalid'))); await flush();
+  assert.equal(f.latest().identity, OWNER);
+  f.access.invalidate();
+});
+
+test('profile check never retries a denial', async () => {
+  const f = fixture(() => response({ detail: 'Admin access required' }, 403));
+  await f.access.setSession(session());
+  assert.equal(f.latest().status, 'denied'); assert.equal(f.requests.length, 1);
 });

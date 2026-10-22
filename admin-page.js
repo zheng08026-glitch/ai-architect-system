@@ -1,4 +1,4 @@
-import { createAdminAccess } from './admin-access.js?v=20261014-r1';
+import { createAdminAccess } from './admin-access.js?v=20261022-speed';
 import { mountMembers } from './admin-members.js?v=20261014-detail-r2';
 import { mountMonitor } from './admin-monitor.js?v=20261017-sharedhost';
 

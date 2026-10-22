@@ -551,6 +551,8 @@ const CLIENT_ID_KEY = "architect-ai-client-id";
 let memberJobs = [];
 let currentMember = null;
 let memberLoadVersion = 0;
+let sessionMemberLoad = null;
+const MEMBER_REQUEST_TIMEOUT_MS = 20000;
 
 function getSupabaseConfig() {
   return {
@@ -788,11 +790,21 @@ async function fetchMemberJson(path) {
   const apiBase = getApiBase();
   const token = getAuthToken();
   if (!apiBase || !token) return null;
-  const response = await fetch(`${apiBase}${path}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) throw new Error("無法取得會員資料");
-  return response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MEMBER_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${apiBase}${path}`, {
+      headers: getAuthHeaders(),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error("無法取得會員資料");
+    return await response.json();
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("會員資料讀取逾時");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function setAdminVisible(isVisible) {
@@ -815,7 +827,7 @@ async function loadMemberCenter() {
   if (!email || !getApiBase()) {
     renderUsageList([]);
     renderJobList([]);
-    return;
+    return true;
   }
 
   try {
@@ -824,7 +836,7 @@ async function loadMemberCenter() {
       fetchMemberJson("/api/member/usage"),
       fetchMemberJson("/api/member/jobs"),
     ]);
-    if (!isCurrent()) return;
+    if (!isCurrent()) return false;
     currentMember = profileData || null;
     siteEditorPromise?.then(editor => editor?.refreshAccess());
     setAdminVisible(hasAdminAccess(profileData));
@@ -832,9 +844,24 @@ async function loadMemberCenter() {
     renderMemberSummary(profileData || {}, usageData || {});
     renderUsageList(usageData?.usage || []);
     renderJobList(jobsData?.jobs || []);
+    return true;
   } catch (error) {
     if (isCurrent() && authMessage) authMessage.textContent = `${error.message}，請稍後再試。`;
+    return false;
   }
+}
+
+// getSession, INITIAL_SESSION and SIGNED_IN (after a login or Google return) report the same
+// session two or three times; load the member center once per session instead of once per report.
+function loadMemberCenterForSession() {
+  const key = `${getAuthEmail()}|${getAuthToken()}`;
+  if (sessionMemberLoad?.key === key) return sessionMemberLoad.promise;
+  const promise = loadMemberCenter().then((loaded) => {
+    if (!loaded && sessionMemberLoad?.promise === promise) sessionMemberLoad = null;
+    return loaded;
+  });
+  sessionMemberLoad = { key, promise };
+  return promise;
 }
 
 function updateAuthUi() {
@@ -867,7 +894,7 @@ async function refreshAuthSession() {
     localStorage.removeItem(AUTH_EMAIL_KEY);
   }
   updateAuthUi();
-  await loadMemberCenter();
+  await loadMemberCenterForSession();
 }
 
 function handleAuthCallbackError() {
@@ -3097,7 +3124,7 @@ async function loginWithEmail() {
     localStorage.setItem(AUTH_TOKEN_KEY, data.session.access_token);
     localStorage.setItem(AUTH_EMAIL_KEY, data.user?.email || email);
     updateAuthUi();
-    await loadMemberCenter();
+    await loadMemberCenterForSession();
     authDialog.close();
   } catch (error) {
     authMessage.textContent = error.message || "登入失敗";
@@ -3295,17 +3322,24 @@ themeButtons.forEach((button) => {
 setTheme(localStorage.getItem("architect-ai-theme") || "violet");
 updateAuthUi();
 refreshAuthSession().finally(handleAuthCallbackError);
-getSupabaseClient()?.auth.onAuthStateChange(async (event, session) => {
-  if (session?.access_token) {
-    localStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
-    localStorage.setItem(AUTH_EMAIL_KEY, session.user?.email || "");
-  } else {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_EMAIL_KEY);
-  }
-  updateAuthUi();
-  await loadMemberCenter();
-  if (event === "SIGNED_IN" && authDialog?.open) authDialog.close();
+getSupabaseClient()?.auth.onAuthStateChange((event, session) => {
+  // Supabase holds its auth lock (shared by every open tab, the admin page included) until this
+  // callback returns, so the member API calls run afterwards instead of inside the lock.
+  setTimeout(() => {
+    const changed = (session?.access_token || "") !== getAuthToken()
+      || (session?.access_token ? session.user?.email || "" : "") !== getAuthEmail();
+    if (session?.access_token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
+      localStorage.setItem(AUTH_EMAIL_KEY, session.user?.email || "");
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_EMAIL_KEY);
+    }
+    // Login, logout and page load already updated the UI (and its message) for this session.
+    if (changed) updateAuthUi();
+    void loadMemberCenterForSession();
+    if (event === "SIGNED_IN" && authDialog?.open) authDialog.close();
+  }, 0);
 });
 
 document.querySelectorAll("[data-scroll-target]").forEach((button) => {
