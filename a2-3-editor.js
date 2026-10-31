@@ -1,11 +1,11 @@
 /* A2-3 editor adapted from the supplied prototype. All tools stay independent of other systems. */
 'use strict';
 window.AiasA23Editor = { async mount(element, platform) {
- const response = await fetch('./a2-3-editor.html?v=a23-progress-compare-20261012-r2', {cache:'no-cache'});
+ const response = await fetch('./a2-3-editor.html?v=a23-step-guide-20261101', {cache:'no-cache'});
  if (!response.ok) throw new Error('A2-3 編輯器載入失敗，請重新整理。');
  const root=element.attachShadow({mode:'open'});
  root.innerHTML=await response.text();
- element.dataset.a23Version='a23-progress-compare-20261012-r2';
+ element.dataset.a23Version='a23-step-guide-20261101';
  const $ = id => root.getElementById(id);
  const stage=$('stage'), host=$('workspace'), ctx=stage.getContext('2d');
  const makeCanvas=()=>document.createElement('canvas');
@@ -55,6 +55,11 @@ window.AiasA23Editor = { async mount(element, platform) {
   $('toolHint').textContent=state.loaded?hints[state.tool]:'上傳後，建議先用「自由圈選」；放開滑鼠，圈內會自動填滿。';
   $('compiled').textContent=compiledPrompt()||'請輸入修改內容。';$('charCount').textContent=$('prompt').value.length;
   $('step1').classList.toggle('current',!state.loaded);$('step2').classList.toggle('current',state.loaded&&!state.count);$('step3').classList.toggle('current',state.count>0);
+
+  // Step guide (same light as A10-Site): upload → select on the canvas → describe → send → download.
+  const next=job.active?null:job.final?$('downloadFinal'):!state.loaded?$('emptyUpload'):!state.count?host:!$('prompt').value.trim()?$('prompt'):full&&!$('fullAck').checked?$('fullAckLabel'):$('submit');
+  root.querySelectorAll('.is-next').forEach(el=>{if(el!==next)el.classList.remove('is-next');});
+  next?.classList.toggle('is-next',!next.disabled);
  }
  function scheduleDraw(){if(!raf)raf=requestAnimationFrame(()=>{raf=0;draw();});}
  function fit(){if(!state.loaded)return;state.zoom=Math.min((host.clientWidth-38)/state.w,(host.clientHeight-38)/state.h,1);state.x=(host.clientWidth-state.w*state.zoom)/2;state.y=(host.clientHeight-state.h*state.zoom)/2;updateUI();scheduleDraw();}

@@ -50,13 +50,14 @@ function fixture(fetcher, options = {}) {
     loadMemberCenter: async () => {},
     renderResult: () => { preview.textContent = 'ready'; },
     renderApp: () => { preview.textContent = 'ready'; },
+    renderToolGuide: () => {},
   };
   const context = vm.createContext(sandbox);
   vm.runInContext(`
     let activeId='A10_V1', a10Watching=null, a10ViewVersion=0;
     let activeResultJobId='', activeResultType='', a93PresetLoadVersion=0;
     let expandedSidebarGroup=null, isHowToUseOpen=false;
-    let memberJobs=[];
+    let memberJobs=[], toolResultReady=false;
     const systems=[{id:'A10_V1',result:'model',status:'Live System'},{id:'A10',result:'model',status:'Live System'},{id:'A1-1',result:'prompt',status:'Live System'}];
     const getSystem=id=>systems.find(s=>s.id===id), getActiveSystem=()=>getSystem(activeId);
     const A10_STATUS_TIMEOUT_MS=${options.requestMs || 10}, A10_WATCH_DURATION_MS=${options.watchMs || 1000};

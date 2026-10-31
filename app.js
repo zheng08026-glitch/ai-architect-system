@@ -436,6 +436,7 @@ function a10V1Inputs() {
     submitA10V1(Number(button.dataset.v1Mode)).catch(error=>{
       if(activeId==="A10_V1")showResultMessage(getActiveSystem(),a10ErrorMessage(error));
     })));
+  renderToolGuide();
 }
 
 // A10-v1 uploads pass through the Cloudflare tunnel (100 MB request limit); 95 MB leaves room for the form.
@@ -1247,6 +1248,7 @@ async function watchA10(jobId, systemId="A10") {
       stopA10Watch();
       showA10WatchMessage(watch, "已停止查詢；背景任務不受影響。可稍後重新查詢，請勿重複送件。", true);
     });
+    renderToolGuide();
   };
   try {
     if (!isCurrent()) return;
@@ -1314,6 +1316,8 @@ function setA10Result(job) {
     }
     finally { event.target.disabled = false; }
   });
+  toolResultReady = true;
+  renderToolGuide();
 }
 
 async function downloadA10(jobId, kind) {
@@ -2026,6 +2030,7 @@ function a2PlusContext(system) {
       activeResultUrl = url; activeResultType = "image"; activeResultIndex = index;
       activeResultUrls = images; activeResultOriginalUrls = images;
       prepareResultBlob(url, index); updateDownloadButtonForResults(system);
+      toolResultReady = true; renderToolGuide();
     },
   };
 }
@@ -2081,6 +2086,7 @@ function renderResult(system) {
   activeResultOriginalUrls = [];
   activeResultJobId = "";
   activeResultIndex = 0;
+  toolResultReady = false;
   const downloadButton = $("#downloadResult");
   if (downloadButton) {
     downloadButton.textContent = getDownloadButtonLabel(system);
@@ -2226,6 +2232,7 @@ function showResultMessage(system, message) {
     mainPreview.textContent = message;
     thumbGrid.innerHTML = "";
   }
+  renderToolGuide();
 }
 
 function fieldNameForInput(input) {
@@ -2360,6 +2367,30 @@ function setVideoResults(videoUrls, system = getActiveSystem(), jobId = activeRe
   thumbGrid.innerHTML = "";
 }
 
+// Step guide (same light as A10-Site): the one control to press next glows —
+// upload, prompt, generate, then download/copy once a result is shown.
+let toolResultReady = false;
+
+function nextToolControl(system) {
+  if (toolResultReady) return system.result === "prompt" ? $("#copyResult") : $("#downloadResult");
+  if (mainPreview.querySelector(".job-progress, [data-a10-stop]") || promptOutput.querySelector(".job-progress")) return null;
+  if (system.id === "A10_V1") return inputStack.querySelector(a10V1File ? ".a10-v1-buttons" : ".drop-zone");
+  const missing = system.inputs.findIndex((input) => !input.optional && !uploadedFiles.get(`${system.id}-${input.key}`));
+  if (missing >= 0) return inputStack.querySelectorAll(".upload-box")[missing];
+  const prompt = $("#customPrompt");
+  if (system.prompt && prompt && !prompt.value.trim()) return prompt.closest(".field-box");
+  return inputStack.querySelector(".generate-button");
+}
+
+function renderToolGuide() {
+  document.querySelectorAll(".tool-panel .is-next").forEach((element) => element.classList.remove("is-next"));
+  const system = getActiveSystem();
+  // A2-3 and A10-Site run their own editors with their own guide.
+  if (system.status !== "Live System" || ["A2-3", "A10_SITE"].includes(system.id)) return;
+  const next = nextToolControl(system);
+  if (next && !next.disabled && next.offsetParent !== null) next.classList.add("is-next");
+}
+
 function setJobResults(system, job) {
   activeResultJobId = job.job_id || "";
   if (isA2Plus(system)) return a2Plus.showResults(system.id, job, a2PlusContext(system));
@@ -2397,9 +2428,12 @@ function openJobResult(index) {
     void watchA10(job.job_id,system.id);
   } else if (system.result === "prompt") {
     promptOutput.textContent = job.output_text || "此任務沒有提示詞內容。";
+    toolResultReady = true;
   } else {
     setJobResults(system, job);
+    toolResultReady = true;
   }
+  renderToolGuide();
 
   document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
   authDialog.close();
@@ -2445,6 +2479,8 @@ function renderJobProgress(system, job = {}) {
     mainPreview.innerHTML = markup;
     thumbGrid.innerHTML = "";
   }
+  toolResultReady = false;
+  renderToolGuide();
 }
 
 async function pollJob(jobId, system) {
@@ -2470,6 +2506,8 @@ async function pollJob(jobId, system) {
         } else {
           setJobResults(system, job);
         }
+        toolResultReady = true;
+        renderToolGuide();
         return;
       }
 
@@ -2632,11 +2670,16 @@ function renderApp() {
 
   renderA23Editor(system);
   renderSiteEditor(system);
-  if (["A2-3", "A10_SITE"].includes(system.id)) { renderHowToUse(system); return; }
+  if (["A2-3", "A10_SITE"].includes(system.id)) { renderHowToUse(system); renderToolGuide(); return; }
   renderInputs(system);
   renderResult(system);
   renderHowToUse(system);
+  renderToolGuide();
 }
+
+// Typing a prompt or picking a preset can move the step guide on.
+inputStack.addEventListener("input", renderToolGuide);
+inputStack.addEventListener("click", renderToolGuide);
 
 async function convertImageBlobToPng(blob) {
   if (blob.type === "image/png") return blob;
