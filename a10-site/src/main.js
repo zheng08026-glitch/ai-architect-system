@@ -28,30 +28,30 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   // The host's "外部資料服務忙碌" text (OpenStreetMap/Overpass unavailable) is shown to members in the owner's wording.
   const failedMessage = job => /外部資料服務忙碌/.test(job.error?.message || '') ? OSM_BUSY_MESSAGE : `任務失敗：${job.error?.message || job.error?.code || '請稍後重試，或聯繫管理員。'}`;
   const number = value => new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(value);
-  const defaultSourceDescription = $('model-source-description').textContent;
-  const defaultPartialDescription = $('partial-consent-description').textContent;
+  // Two-way settings show both choices as buttons; the hidden <select> stays the value the rest of the page reads.
+  for (const select of root.querySelectorAll('select[data-choice]')) {
+    const group = document.createElement('div'); group.className = 'choice'; group.dataset.for = select.id;
+    group.setAttribute('role', 'group'); group.setAttribute('aria-labelledby', select.getAttribute('aria-labelledby'));
+    for (const option of select.options) {
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.value = option.value; button.textContent = option.textContent;
+      listen(button, 'click', () => { if (select.value !== option.value) { select.value = option.value; select.dispatchEvent(new Event('change')); } });
+      group.append(button);
+    }
+    select.hidden = true; select.after(group);
+  }
+  const syncChoices = () => { for (const group of root.querySelectorAll('.choice[data-for]')) for (const button of group.children) button.setAttribute('aria-pressed', String($(group.dataset.for).value === button.dataset.value)); };
   const nlscConfigured = () => config?.map?.nlscAerial?.displayOnly === true && typeof config.map.nlscAerial.url === 'string';
   const leafletConfig = () => state.basemap === 'nlsc-aerial'
     ? { ...config.map.nlscAerial, id: 'nlsc-aerial' }
     : { ...(config?.map || config?.basemap || {}), id: 'osm' };
   function renderBasemap() {
     const google=state.provider==='google', nlsc=!google&&state.basemap==='nlsc-aerial';
-    $('leaflet-basemap-field').hidden=google;
-    $('basemap-notice').hidden=google;
+    // Street map and PHOTO2 are the only display choices; with PHOTO2 unconfigured there is nothing to pick.
+    $('basemap-toggle').hidden=google||!nlscConfigured();
+    for(const button of $('basemap-toggle').children)button.setAttribute('aria-pressed',String(button.dataset.basemap===state.basemap));
     // The long official attribution and tile-inherent labels need the lower map
     // edge; keep our decorative location badge out of that space for PHOTO2.
     $('map-location-label').hidden=nlsc;
-    $('leaflet-basemap').value=state.basemap;
-    $('leaflet-basemap').querySelector('option[value="nlsc-aerial"]').disabled=!nlscConfigured();
-    $('map-provider-label').textContent=google?'Google 一般地圖 · 非航照':nlsc?'國土測繪中心正射影像 · 僅顯示':'OSM 街道底圖 · 非航照';
-    $('basemap-notice').replaceChildren();
-    if(nlsc){
-      $('basemap-notice').append(document.createTextNode('國土測繪中心航照已接入顯示，可定位與框選；本次未接影像匯出或 SKP 貼圖。© 內政部國土測繪中心｜正射影像圖（臺灣通用）。'));
-      for(const [label,url] of [['來源服務','https://maps.nlsc.gov.tw/'],['使用規定','https://maps.nlsc.gov.tw/pro/use_clause.jsp']]){
-        const link=document.createElement('a');link.textContent=label;link.href=url;link.target='_blank';link.rel='noopener';
-        $('basemap-notice').append(document.createTextNode(' '),link);
-      }
-    }else $('basemap-notice').textContent='OSM 街道圖僅供定位，並非航照成果。切換底圖會保留已選範圍與 Photon 地址標記。';
   }
   const spacing = value => new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 3 }).format(value);
   const terrainSampling = terrain => [Number.isFinite(terrain?.nominalResolutionM) && terrain.nominalResolutionM > 0 ? `來源格網 ${spacing(terrain.nominalResolutionM)}m` : '來源解析度待確認', Number.isFinite(terrain?.intermediateSpacingM) && terrain.intermediateSpacingM > 0 ? `中間取樣 ${spacing(terrain.intermediateSpacingM)}m` : '', Number.isFinite(terrain?.meshSpacingM) && terrain.meshSpacingM > 0 ? `建模網格 ${spacing(terrain.meshSpacingM)}m` : ''].filter(Boolean).join('；');
@@ -101,7 +101,27 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     const year = coverage?.terrain?.sourceYear || coverage?.actual?.terrainSourceYear;
     const dates = coverage?.terrain?.sourceDates || coverage?.actual?.terrainSourceDates;
     if (year) { const item = document.createElement('li'); item.textContent = `本次地形來源：${coverage.terrain?.sourceTitle ? `${coverage.terrain.sourceTitle}；` : ''}${year} 年${Array.isArray(dates) && dates.length ? `（來源日期 ${dates.join('、')}）` : ''}；${terrainSampling(coverage.terrain)} 歷史資料${coverage.terrain?.verticalDatum ? `；高程基準 ${coverage.terrain.verticalDatum}` : ''}，非現況實測。`; $('job-gaps').append(item); }
-    $('job-coverage-label').textContent = coverage ? '資料限制（實際來源與缺漏請以成果報告為準）' : '送出前會先檢查範圍與已知資料限制。';
+    $('job-coverage-label').textContent = coverage ? '資料限制（實際來源與缺漏請以成果報告為準）' : '';
+  }
+  // Opacity follows the SketchUp job: only buildings at the user-specified placeholder height are 50 % white.
+  const HEIGHT_NOTES = {
+    massing: ['優先依據資料來源高度，其次依樓層數估高（建築量體白色不透明）。', '無高度者採指定示意高度，非實際建築高度（建築量體白色半透明 50%）。'],
+    levels: ['優先依據資料來源高度，其次依樓層數估高（建築量體白色不透明）。', '無高度也無樓層資料者保留輪廓，不建量體。'],
+    'source-only': ['只依據資料來源高度（建築量體白色不透明）。', '無高度者保留輪廓，不建量體。'],
+  };
+  // Light up the step in progress and the one control that moves it forward.
+  function renderGuide({ enabled, confirmed, busy, complete }) {
+    const located = !!state.bounds && !(state.selection.method === 'address' && !state.selection.markerConfirmed);
+    const step = !located ? 1 : state.pendingEdits || generationRangeError(state.bounds, true) ? 2 : !confirmed ? 3 : 4;
+    let next = null;
+    if (step === 1) next = state.drawing ? null : state.mode === 'map' ? $('map-start-draw') : state.selection.candidate ? $('confirm-marker') : state.candidates.length ? $('candidates') : root.querySelector('.search-field');
+    else if (step === 2) next = !state.pendingEdits ? $('range-form') : editedRangeKind === 'size' ? $('apply-size') : $('apply-bounds');
+    else if (step === 3) next = $('confirm-range');
+    else if (complete) next = $('download-skp').disabled ? null : $('download-skp');
+    else if (!busy) next = $('accept-partial').checked ? $('generate-skp') : $('accept-partial').closest('label');
+    for (const panel of root.querySelectorAll('.step-panel')) panel.dataset.state = !enabled ? '' : Number(panel.dataset.step) < step ? 'done' : Number(panel.dataset.step) === step ? 'active' : '';
+    for (const element of root.querySelectorAll('.is-next')) if (element !== next) element.classList.remove('is-next');
+    next?.classList.toggle('is-next', enabled && !next.disabled);
   }
   function updateJob(ready) {
     const enabled = localWorkerEnabled();
@@ -120,26 +140,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('dataset-demo').hidden = !hasDemoBounds;
     $('load-dataset-range').disabled = !hasDemoBounds || !map || state.providerBusy;
     $('load-dataset-range').textContent = /nyc|紐約/i.test(`${dataset?.id || ''} ${dataset?.title || ''}`) ? '載入 NYC 示範範圍' : '載入資料集示範範圍';
-    if (dataset?.id) {
-      const terrain = dataset.terrain || {};
-      const terrainDescription = `${textValue(terrain.sourceTitle)}，${terrain.sourceYear || '年份未知'} 年；${terrainSampling(terrain)}，高程基準 ${textValue(terrain.verticalDatum)}`;
-      const buildingsDescription = `${textValue(dataset.buildings?.sourceTitle)} 高度依來源欄位；仍需現況核對，缺高不補造`;
-      const roadsDescription = dataset.roads?.representation === 'centerlines-only' ? '道路僅中心線' : '道路資料依來源標示，未核驗實際邊界';
-      $('model-source-description').textContent = `${textValue(dataset.title)}。建物：${buildingsDescription}。地形：${terrainDescription}，非現況實測。${roadsDescription}。`;
-      $('partial-consent-description').textContent = `同意先產生部分成果：${buildingsDescription}；${roadsDescription}；地形為 ${terrainDescription} 歷史資料，並非現況實測。影像僅在來源授權與驗證通過後提供，否則不含影像；並非完整基地模型。`;
-    } else {
-      $('model-source-description').textContent = defaultSourceDescription;
-      $('partial-consent-description').textContent = defaultPartialDescription;
-    }
-    if (state.terrainMode === 'flat') {
-      $('model-source-description').textContent = '全平面輸出：忽略地形起伏，建物基底使用 Z=0。建物高度依來源；缺高仍保留輪廓，道路目前僅中心線。';
-      $('partial-consent-description').textContent = '同意先產生部分成果：全平面模式忽略地形高程，Z=0 為任意模型基準；建物高度未實測核實，缺高不補造；道路僅中心線，航照須來源與驗證通過後才提供。';
-    }
-    const heightText=state.siteOptions.buildingMode==='massing' ? '來源高度優先，其次樓層估高；仍缺高建築以 '+state.siteOptions.fallbackHeightM+'m 建立示意量體，特殊例外保留輪廓。' : state.siteOptions.buildingMode==='levels' ? '來源高度優先；缺高且樓層資料明確者以每層 '+state.siteOptions.floorHeightM+'m 估高，例外留輪廓。' : '只使用來源高度，缺高保留輪廓。';
-    const terrainText=state.terrainMode==='flat'?'全平面 Z=0，忽略地勢。':'保留歷史 DTM 高程起伏，非基地實測。';
-    const contextText=state.siteOptions.contextMode==='schematic'?'道路寬度與街廓為示意；捷運路線不代表高架或地下高程。':'道路僅中心線。';
-    $('model-source-description').textContent=heightText+terrainText+contextText;
-    $('partial-consent-description').textContent='同意產生部分成果：'+heightText+terrainText+contextText+(state.siteOptions.aerialMode==='private-photo2'?'官方航照僅內嵌私人模型，原始標示保留；取得失敗會列入缺漏。':'未選擇官方航照內嵌。');
+    $('model-source-description').textContent = HEIGHT_NOTES[state.siteOptions.buildingMode].join('\n');
     $('worker-state').textContent = enabled ? '建模服務可用' : '建模服務未啟用';
     const reliefBlocked = reliefOutside();
     $('relief-coverage-warning').hidden = !reliefBlocked;
@@ -150,15 +151,20 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('generate-skp').title = enabled ? '由 AIAS 建模服務執行；航照須通過來源授權與影像驗證' : '本功能使用需管理員開通';
     $('download-skp').disabled = !confirmed || !current || !artifactUrl('model');
     $('download-report').disabled = !confirmed || !current || !artifactUrl('report');
-    $('download-skp').textContent = artifactUrl('model') && current ? '下載已驗證的部分成果 SKP' : '下載 SKP · 尚無已驗證檔案';
+    $('download-report').hidden = !jobFlow.job;
+    $('download-skp').textContent = artifactUrl('model') && current ? '下載已驗證的部分成果 SKP' : '下載 SKP · 完成後可用';
+    // The member service only returns SKP + report, so the separate aerial card stays out of the way until an export exists.
+    $('aerial-card').hidden = !aerialAvailable;
+    $('aerial-disclosure').hidden = !aerialAvailable && !syntheticAerial;
     $('download-aerial').disabled = !confirmed || !aerialAvailable;
     $('download-aerial').textContent = aerialAvailable ? `下載已驗證的授權${imageryLabel} PNG` : '↓ 下載航照 PNG · 尚無已驗證檔案';
     $('download-aerial').closest('.output-grid > div').querySelector('h3').firstChild.textContent = satellite ? '選取範圍衛星影像 ' : '選取範圍航照圖 ';
     $('aerial-date').textContent = aerialMetadata ? textValue(aerialMetadata.acquisitionDate) : '未知 · 待來源提供';
     $('aerial-resolution').textContent = aerialMetadata && Number.isFinite(aerialMetadata.nominalResolutionM) && aerialMetadata.nominalResolutionM > 0 ? `${aerialMetadata.nominalResolutionM} m/pixel（來源標稱）；列印比例尺依輸出尺寸` : '未知 · 待來源解析度';
     $('aerial-source').textContent = aerialMetadata ? `${textValue(aerialMetadata.sourceTitle)}；${textValue(aerialMetadata.attribution)}；授權：${textValue(aerialMetadata.licenseId)}（${textValue(aerialMetadata.licenseUrl)}）` : syntheticAerial ? '合成測試影像，非真實航照，不提供航照下載' : '尚無已驗證授權航照';
-    $('model-aerial-note').textContent = aerialAvailable ? `已有同範圍授權${imageryLabel}可下載；樓高等限制仍使本模型屬部分成果。` : '尚無已驗證航照；不是完整基地模型。';
-    if(state.siteOptions.aerialMode==='private-photo2') $('model-aerial-note').textContent = jobFlow.job?.coverage?.privateAerialEmbedded && current ? '官方航照已內嵌 SKP，原生重開驗證通過；不提供獨立影像下載。' : '生成時取得框選範圍的一張官方航照，並驗證內嵌；尚未完成前不宣稱已有貼圖。';
+    $('model-aerial-note').textContent = aerialAvailable ? `已有同範圍授權${imageryLabel}可下載；樓高等限制仍使本模型屬部分成果。` : '不含航照貼圖。';
+    const embedded = complete ? jobFlow.job?.coverage?.privateAerialEmbedded : undefined;
+    if(state.siteOptions.aerialMode==='private-photo2') $('model-aerial-note').textContent = embedded === true ? '官方航照已內嵌 SKP，重開驗證通過。' : embedded === false ? '本次未取得官方航照，地面與街廓為灰色。' : complete ? '航照結果請見成果報告。' : '生成時內嵌官方航照，完成後驗證。';
     const displayNotice = state.provider!=='google'&&state.basemap==='nlsc-aerial'
       ? '國土測繪中心航照已接入顯示，可定位與框選；模型是否內嵌航照，依本次輸出選項與驗證結果。'
       : '上方顯示底圖只用於定位，與本區成果來源分開。';
@@ -170,6 +176,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     }
     $('job-state').textContent = ({ queued: '排隊中', running: '產生中', partial: '部分成果', succeeded: '完成', failed: '失敗' })[jobFlow.job?.status] || (jobFlow.submitting ? '送出中' : '尚未送出');
     renderProgress();
+    root.querySelector('.job-heading').hidden = !jobFlow.job && !jobFlow.submitting;
     $('refresh-job').hidden = !jobFlow.job;
     $('refresh-job').disabled = jobFlow.polling || jobFlow.submitting;
     if (jobFlow.job) {
@@ -178,9 +185,10 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       $('job-range').textContent = `任務範圍：${Math.round(size.widthM)} × ${Math.round(size.depthM)} m；W ${bounds.west} / S ${bounds.south} / E ${bounds.east} / N ${bounds.north}${!current || !confirmed ? '。目前範圍已改變或尚未確認，下載暫停。' : ''}`;
     } else $('job-range').textContent = '';
     if (!enabled) $('export-state').textContent = '本功能使用需管理員開通';
-    else if (complete) $('export-state').textContent = aerialAvailable ? `部分 SKP 與授權${imageryLabel}可用；請一併閱讀成果報告` : '部分 SKP 可用；尚無可下載的授權航照，請一併閱讀成果報告';
+    else if (complete) $('export-state').textContent = aerialAvailable ? `部分 SKP 與授權${imageryLabel}可用；請一併閱讀成果報告` : '部分 SKP 可用；請一併閱讀成果報告';
     if (complete && jobFlow.job?.coverage?.privateAerialEmbedded) $('export-state').textContent='部分 SKP 已含航照貼圖；請一併閱讀成果報告';
-    else if (confirmed && !complete) $('export-state').textContent = reliefBlocked ? RELIEF_COVERAGE_MESSAGE : '已確認範圍；請確認部分成果限制後送出';
+    else if (confirmed && !complete) $('export-state').textContent = reliefBlocked ? RELIEF_COVERAGE_MESSAGE : $('accept-partial').checked ? '可以送出建模' : '勾選同意後即可送出';
+    renderGuide({ enabled, confirmed, busy, complete });
   }
   // Stage reported by the worker → [label, fallback %, step index (0 排隊 … 4 回傳成果, 5 = all done)]
   const SITE_STAGES = { queued: ['排隊中', 0, 0], leased: ['準備資料', 5, 1], preparing: ['準備資料', 5, 1],
@@ -242,16 +250,22 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     const generationError = generationRangeError(bounds, true);
     const limits = generationLimits();
     $('generation-limit').hidden = !limits;
-    $('generation-limit').textContent = limits ? '模型生成上限：寬度、深度各 ' + number(limits.maxSideM) + ' 公尺；面積 ' + number(limits.maxAreaM2) + ' m²。' : '';
+    $('generation-limit').textContent = limits ? '上限：寬、深各 ' + number(limits.maxSideM) + ' m，面積 ' + number(limits.maxAreaM2) + ' m²。' : '';
     for (const id of ['width-input', 'depth-input']) $(id).max = limits ? limits.maxSideM : 10000;
     const pendingMarker = state.selection.method === 'address' && !state.selection.markerConfirmed;
     const ready = Number.isFinite(state.siteOptions.fallbackHeightM) && state.siteOptions.fallbackHeightM>=1 && state.siteOptions.fallbackHeightM<=100 && Number.isFinite(state.siteOptions.floorHeightM) && state.siteOptions.floorHeightM >= 2 && state.siteOptions.floorHeightM <= 6 && validation.valid && !generationError && !pendingMarker && !state.drawing && !state.pendingEdits && !googleDerived() && !state.providerBusy;
     $('confirm-range').disabled = !ready || !!state.confirmedAt;
+    // Show only the settings the chosen options use; an invalid value stays visible so it can be fixed.
+    const { buildingMode, floorHeightM, fallbackHeightM } = state.siteOptions;
+    $('floor-height-field').hidden = buildingMode === 'source-only' && floorHeightM >= 2 && floorHeightM <= 6;
+    $('fallback-height-field').hidden = buildingMode !== 'massing' && fallbackHeightM >= 1 && fallbackHeightM <= 100;
+    $('block-material-field').hidden = state.siteOptions.contextMode !== 'schematic' || state.siteOptions.aerialMode !== 'private-photo2';
+    syncChoices();
     $('export-json').disabled = !ready || !state.confirmedAt;
     $('apply-size').disabled = !bounds || state.drawing || !scopeVisible() || state.providerBusy;
     $('fit-btn').disabled = !bounds || !scopeVisible() || state.providerBusy;
     $('map-provider').disabled = state.providerBusy || !map;
-    $('leaflet-basemap').disabled = state.providerBusy || !map || state.provider === 'google';
+    for (const button of $('basemap-toggle').children) button.disabled = state.providerBusy || !map || state.provider === 'google';
     $('search-btn').disabled = state.searching || state.providerBusy;
     $('draw-btn').disabled = !map || state.providerBusy;
     $('map-start-draw').disabled = !map || state.providerBusy;
@@ -264,8 +278,8 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     root.querySelector('.range-panel .coordinates').hidden = !scopeVisible();
     $('clear-btn').disabled = !bounds && !state.selection.candidate && !state.drawing && !state.searching && !state.candidates.length;
     $('range-state').textContent = state.pendingEdits ? '待套用' : state.confirmedAt ? '已確認' : bounds ? '待確認' : '尚未選取';
-    $('confirm-range').textContent = state.confirmedAt ? '✓ 基地範圍已確認' : '確認基地範圍 →';
-    $('export-state').textContent = state.confirmedAt ? '範圍已確認，等待模型與航照服務接入' : '先確認基地範圍';
+    $('confirm-range').textContent = state.confirmedAt ? '✓ 範圍與設定已確認' : '確認範圍與設定 →';
+    $('export-state').textContent = state.confirmedAt ? '範圍已確認，等待模型與航照服務接入' : '先在 03 確認範圍與設定';
     $('range-warning').hidden = !(generationError || validation.warnings.length) || !scopeVisible();
     $('range-warning').textContent = [generationError, ...validation.warnings].filter(Boolean).join(' ');
     if (bounds) {
@@ -275,7 +289,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       const unit = document.createElement('small'); unit.textContent = 'm²'; $('area-value').append(unit);
       $('center-value').textContent = `${info.center.lng.toFixed(6)}, ${info.center.lat.toFixed(6)}`;
       if (!state.pendingEdits) for (const name of ['west', 'south', 'east', 'north']) $(`${name}-input`).value = bounds[name].toFixed(7);
-      status('range-status', state.drawing ? '正在框選；完成第二個角點後會替換原範圍。' : pendingMarker ? '先確認地址標記，再確認基地範圍。' : state.confirmedAt ? '範圍已確認。變更尺寸或重畫後，需再次確認。' : '尺寸與面積為球面近似值；模型與航照圖會共用此範圍。', state.confirmedAt ? 'success' : '');
+      status('range-status', state.drawing ? '正在框選；完成第二個角點後會替換原範圍。' : pendingMarker ? '先確認地址標記，再確認基地範圍。' : state.confirmedAt ? '範圍已確認。變更尺寸或重畫後，需再次確認。' : '可調整尺寸或重畫範圍；完成後在 03 確認。', state.confirmedAt ? 'success' : '');
     } else {
       $('area-value').textContent = '— m²'; $('center-value').textContent = '尚未選取';
       if (!state.pendingEdits) for (const name of ['west', 'south', 'east', 'north']) $(`${name}-input`).value = '';
@@ -305,6 +319,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('mode-address').setAttribute('aria-pressed', String(mode === 'address'));
     $('mode-map').setAttribute('aria-pressed', String(mode === 'map'));
     $('address-panel').hidden = mode !== 'address'; $('map-mode-panel').hidden = mode !== 'map';
+    update();
   }
   function startDrawing() { if (state.providerBusy) return; map?.setDrawing(true); $('map').focus({ preventScroll: true }); if (innerWidth < 850) $('map').scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   function showCandidates() {
@@ -401,6 +416,9 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     if (!state.bounds || generationRangeError(state.bounds) || state.drawing || state.pendingEdits || !validateBounds(state.bounds).valid || (state.selection.method === 'address' && !state.selection.markerConfirmed)) return;
     state.confirmedAt ||= new Date().toISOString(); update();
     root.dispatchEvent(new CustomEvent('aias:range-confirmed', { bubbles: true, detail: buildRequest(state) }));
+    // Step 04 sits under the map; bring its consent box into view when it is off screen.
+    const consent = root.querySelector('.partial-consent').getBoundingClientRect();
+    if (consent.top < 0 || consent.bottom > innerHeight) root.querySelector('.partial-consent').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   });
   listen($('export-json'), 'click', () => {
     if (googleDerived() || state.providerBusy) return;
@@ -419,7 +437,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   listen($('terrain-mode'), 'change', () => {
     state.terrainMode=$('terrain-mode').value;
     state.confirmedAt=null; $('accept-partial').checked=false;
-    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，所有建物基底使用 Z=0；地面使用最小平面，不含密集地形網格。' : '保留來源地形起伏，隱藏內部三角網格線；高程不是基地實測。涵蓋臺灣本島、澎湖、金門，海面以 0 m 表示。';
+    $('terrain-mode-note').textContent=state.terrainMode==='flat' ? '忽略地勢，建物基底 Z=0。' : '依 20 m 數值地形模型起伏，非基地實測；涵蓋臺灣本島、澎湖、金門，海面以 0 m 表示。';
     update();
   });
   listen($('accept-partial'), 'change', update);
@@ -492,9 +510,8 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
       onDrawError(message) { $('draw-instruction').textContent = message; },
       onLoading() { $('map-loading').textContent=state.provider==='google'?'載入 Google 地圖中…':state.basemap==='nlsc-aerial'?'載入國土測繪中心正射影像中…':'載入 OSM 街道圖中…'; $('map-loading').hidden = false; $('map-error').hidden=true; },
       onLoaded(success) { $('map-loading').hidden = true; $('map-error').hidden = success && !(state.provider === 'google' && googleFailure);
-        if(state.provider!=='google'&&success)status('provider-status',state.basemap==='nlsc-aerial'
-          ?'國土測繪中心正射影像已載入，可定位與框選；地址搜尋仍使用 Photon，本次未接影像匯出。'
-          :'OSM 街道圖已載入；範圍與地址標記保留。','success');
+        // A loaded basemap needs no message; this also clears an earlier tile error.
+        if(state.provider!=='google'&&success)status('provider-status','');
       },
       onTileError() { $('map-loading').hidden = true; $('map-error').hidden = false;
         $('map-error').querySelector('span').textContent=state.provider!=='google'&&state.basemap==='nlsc-aerial'
@@ -516,7 +533,7 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
     $('map-provider').value = provider;
     $('geocoder-notice').textContent = provider === 'google'
       ? '按下搜尋才會將地址送至 Google Maps；不會自動完成或批量查詢。Google 候選只在 Google 地圖顯示，正式輸出使用獨立授權資料。'
-      : '按下搜尋才會將地址送至 Photon（komoot）。不會自動完成或批量查詢。';
+      : '按下搜尋才會將地址送至 Photon（komoot）。';
     map.setMarker(scopeVisible() ? state.selection.candidate : null);
     if (state.bounds && scopeVisible()) map.fit(state.bounds);
     else if (!state.bounds && validateBounds(config?.experimentalLocalWorker?.dataset?.demoBounds).valid) {
@@ -567,15 +584,15 @@ export async function mountSiteModel(root, { adapters = createHttpAdapters(), ma
   }
   try {
     createMap('osm');
-    if (config?.googleMaps?.apiKey?.trim()) $('map-provider').options[1].textContent = 'Google Maps';
+    // The owner does not use Google's copyrighted basemap: the service picker only appears once a Google key is configured.
+    if (config?.googleMaps?.apiKey?.trim()) { $('map-provider').options[1].textContent = 'Google Maps'; $('map-provider-field').hidden = false; $('map-service-note').hidden = true; }
   } catch (error) { $('map-loading').hidden = true; $('map-error').hidden = false; $('map-error').querySelector('span').textContent = error.message; $('draw-btn').disabled = true; $('map-start-draw').disabled = true; }
   listen($('map-provider'), 'change', () => changeProvider($('map-provider').value));
-  listen($('leaflet-basemap'),'change',()=>{
-    const next=$('leaflet-basemap').value;
+  listen($('basemap-toggle'),'click',event=>{
+    const next=event.target.closest('button')?.dataset.basemap;
     if(state.provider==='google'||state.providerBusy||!map||!['osm','nlsc-aerial'].includes(next)||next===state.basemap)return;
-    if(next==='nlsc-aerial'&&!nlscConfigured()){$('leaflet-basemap').value=state.basemap;status('provider-status','國土測繪中心航照顯示尚未設定。','error');return;}
-    state.basemap=next;renderBasemap();
-    status('provider-status',next==='nlsc-aerial'?'已選國土測繪中心正射影像，正在載入；僅供定位顯示，地址搜尋仍使用 Photon。':'正在載入 OSM 街道圖；範圍與地址標記保留。');
+    if(next==='nlsc-aerial'&&!nlscConfigured()){status('provider-status','國土測繪中心航照顯示尚未設定。','error');return;}
+    state.basemap=next;renderBasemap();status('provider-status','');
     try{map.setBasemap(leafletConfig());}
     catch(error){mapCallbacks.onTileError();status('provider-status',`底圖切換失敗：${error.message||'請重試。'} 未自動改用其他來源。`,'error');}
     update();

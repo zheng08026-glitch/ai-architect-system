@@ -1,4 +1,4 @@
-import { mountSiteModel } from './main.js?v=20261018-osmbusy';
+import { mountSiteModel } from './main.js?v=20261101-ux';
 import { remoteAdapters } from './remote-adapters.js?v=20261015-dem2025';
 import publicConfig from './public-config.js?v=20261015-dem2025';
 
@@ -25,7 +25,7 @@ export async function mount(host, platform) {
   template.querySelectorAll('.app-header, .page-title, footer, script').forEach(node => node.remove());
   await loadLeaflet();
   const shadow = host.attachShadow({ mode: 'open' });
-  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261015-dem2025', '../embedded.css?v=20261015-dem2025'].map(path => new Promise((resolve, reject) => {
+  const stylesReady = Promise.all(['../vendor/leaflet.css', '../styles.css?v=20261101-ux', '../embedded.css?v=20261101-ux'].map(path => new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet'; link.href = asset(path); link.onload = resolve;
     link.onerror = () => reject(Error('工作區樣式載入失敗，請重試。'));

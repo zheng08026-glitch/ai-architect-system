@@ -353,7 +353,7 @@ function renderSiteEditor(system) {
   }
   host = document.createElement('div'); host.id = 'a10SiteHost'; panel.append(host);
   host.textContent = '正在載入 A10-Site 工作區…';
-  siteEditorPromise = import('./a10-site/src/embedded.js?v=20261018-osmbusy').then(async editor => {
+  siteEditorPromise = import('./a10-site/src/embedded.js?v=20261101-ux').then(async editor => {
     host.textContent = '';
     return editor.mount(host, {
       apiBase: getApiBase, token: getAuthToken, email: getAuthEmail,

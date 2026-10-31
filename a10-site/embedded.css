@@ -9,11 +9,14 @@
 .aias-site-model .controls, .aias-site-model .canvas-column { display:grid; }
 .aias-site-model .panel, .aias-site-model .map-card { background:var(--panel); border-color:var(--line-soft); padding:16px; }
 .aias-site-model .map-card { padding:0; }
-.aias-site-model input, .aias-site-model select, .aias-site-model .provider-field select { color:var(--text); background:var(--bg); border:1px solid var(--line-soft); border-radius:6px; font:inherit; padding:9px; max-width:100%; }
+.aias-site-model input, .aias-site-model select, .aias-site-model .provider-field select { color:var(--text); background:var(--bg); border:1px solid var(--line-soft); border-radius:6px; font:inherit; font-size:15px; padding:9px; max-width:100%; }
 .aias-site-model select { display:block; width:100%; margin-top:7px; min-height:42px; }
 .aias-site-model .secondary, .aias-site-model .mode-tabs, .aias-site-model .candidate { background:var(--panel); border-color:var(--line-soft); color:var(--text); }
 .aias-site-model .mode-tabs button { color:var(--muted); background:transparent; }
 .aias-site-model .mode-tabs button[aria-pressed=true], .aias-site-model .candidate.selected { background:var(--accent-soft); color:var(--text); }
+.aias-site-model .choice { background:var(--bg); border:1px solid var(--line-soft); }
+.aias-site-model .choice [aria-pressed=true] { background:var(--accent-soft); color:var(--text); box-shadow:inset 0 0 0 1px var(--system-card-id, #a36dff); }
+.aias-site-model .step-panel[data-state=active] .step { color:#061b18; }
 .aias-site-model .primary, .aias-site-model .search-field button { background:var(--cyan); border-color:var(--cyan); color:#061b18; }
 .aias-site-model .partial-consent, .aias-site-model .aerial-disclosure, .aias-site-model .warning, .aias-site-model .marker-panel { background:var(--accent-soft); border-color:var(--line-soft); color:var(--text); }
 .aias-site-model .pending, .aias-site-model .muted, .aias-site-model #job-gaps { color:var(--muted); }
@@ -31,16 +34,18 @@
   .aias-site-model .locate-panel { order:1; }
   .aias-site-model .map-card { order:2; }
   .aias-site-model .range-panel { order:3; }
-  .aias-site-model .source-note { order:4; }
+  .aias-site-model .settings-panel { order:4; }
   .aias-site-model .output-panel { order:5; }
   .aias-site-model .integration-note { order:6; }
   .aias-site-model .map-wrap { height:400px; }
+  /* 16 px keeps phone browsers from zooming into a focused field. */
+  .aias-site-model input, .aias-site-model select { font-size:16px; }
 }
 @container (max-width: 520px) {
   .aias-site-model main { padding:12px; }
   .aias-site-model .output-grid.deliverables { grid-template-columns:1fr; gap:18px; }
   .aias-site-model .deliverables>div { padding:0; border-left:0; }
-  .aias-site-model .output-heading, .aias-site-model .output-actions { flex-direction:column; align-items:stretch; }
+  .aias-site-model .output-actions { flex-direction:column; align-items:stretch; }
   .aias-site-model .map-type { display:none; }
   .aias-site-model .map-wrap { height:340px; }
   .aias-site-model .map-caption { flex-wrap:wrap; }
