@@ -331,6 +331,13 @@ const sidebarGroups = [
 gridSystems.push({...systems.find((system) => system.id === "A10_V1"), targetId:"A10_V1", gridDisplayId: "A10", title: "2D TO 3D"});
 systems.push({...legacyA10,id:"A10_SITE",status:"Live System",subtitle:"基地模型・SKP 2019",displayId:"A10-Site",title:"A10-Site",activeTitle:"A10-Site｜基地模型",desc:"框選基地，生成地形、街廓與建築示意模型。",tier:"全功能開通",result:"site"});
 sidebarGroups.push({id:"A10",title:"2D TO 3D",summary:"DXF／基地 → SketchUp",childIds:["A10_V1","A10_SITE"]});
+// A11-1 PDF(向量格式) 2 DXF: embedded tool (a11/embedded.js) with its own queue; members, no credits.
+systems.push({id:"A11_1",status:"Live System",tier:"會員",result:"dxf",inputs:[],count:false,prompt:false,
+  displayId:"A11",title:"PDF TO DXF",subtitle:"PDF(向量格式) 2 DXF",activeTitle:"A11-1｜PDF(向量格式) 2 DXF",
+  desc:"上傳 CAD 直接輸出的向量 PDF 圖面，轉成保留圖層、實際尺寸（mm）的 DXF，並自動核對尺寸標註。會員可用，不扣點數。"});
+gridSystems.push({...systems.find((system) => system.id === "A11_1"), targetId:"A11_1", gridDisplayId:"A11", title:"PDF TO DXF", subtitle:"PDF(向量格式) 2 DXF"});
+sidebarGroups.push({id:"A11",systemId:"A11_1"});
+const EMBEDDED_TOOL_IDS = ["A2-3", "A10_SITE", "A11_1"];
 
 if (a2PlusEntryEnabled && a2Plus) sidebarGroups.find(group => group.id === "A2").childIds = ["A2-1", "A2-1-PLUS", "A2-1-PLUS-PRECISE", "A2-2", "A2-2-PLUS"];
 if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
@@ -339,6 +346,33 @@ let activeId = a23LocalTest ? "A2-3" : "A1-1";
 let expandedSidebarGroup = a23LocalTest ? "A2" : null;
 let a23EditorPromise = null;
 let siteEditorPromise = null;
+let a11EditorPromise = null;
+
+function renderA11Editor(system) {
+  const panel = document.querySelector('.tool-panel');
+  const active = system.id === 'A11_1';
+  panel.classList.toggle('a11-active', active);
+  let host = document.getElementById('a11Host');
+  if (!active) { if (host) host.hidden = true; return; }
+  if (host) { host.hidden = false; a11EditorPromise?.then(editor => editor?.refreshAccess()); return; }
+  host = document.createElement('div'); host.id = 'a11Host'; panel.append(host);
+  host.textContent = '正在載入 A11-1 PDF(向量格式) 2 DXF…';
+  a11EditorPromise = import('./a11/embedded.js?v=20261111-a11').then(async editor => {
+    host.textContent = '';
+    return editor.mount(host, {
+      apiBase: getApiBase, token: getAuthToken, email: getAuthEmail,
+      refreshMember: loadMemberCenter,
+      login: () => { authMessage.textContent = '請登入會員後使用 A11-1 PDF(向量格式) 2 DXF。'; authDialog.showModal(); },
+    });
+  }).catch(() => {
+    host.remove();
+    const error = document.createElement('div'); error.id = 'a11Host';
+    error.innerHTML = '<p>A11-1 工作區載入失敗，請重試。</p><button type="button" class="text-button">重新載入工作區</button>';
+    error.hidden = activeId !== 'A11_1'; panel.append(error);
+    error.querySelector('button').onclick = () => { error.remove(); a11EditorPromise = null; renderA11Editor(getActiveSystem()); };
+    return null;
+  });
+}
 
 function renderSiteEditor(system) {
   const panel = document.querySelector('.tool-panel');
@@ -1035,6 +1069,7 @@ const systemArtworkCrops = {
   A9: { box: [791, 529, 190, 90] },
   A10: { box: [1039, 532, 194, 103], clip: "1039,532 1233,532 1233,621 1189,621 1189,635 1080,635 1080,631 1039,631" },
 };
+systemArtworkCrops.A11 = systemArtworkCrops.A10;   // drawing-to-CAD family art until A11 gets its own
 
 function systemIllustration(systemId, className) {
   const familyId = systemId.match(/^A\d+/)?.[0] || "A1";
@@ -2386,7 +2421,7 @@ function renderToolGuide() {
   document.querySelectorAll(".tool-panel .is-next").forEach((element) => element.classList.remove("is-next"));
   const system = getActiveSystem();
   // A2-3 and A10-Site run their own editors with their own guide.
-  if (system.status !== "Live System" || ["A2-3", "A10_SITE"].includes(system.id)) return;
+  if (system.status !== "Live System" || EMBEDDED_TOOL_IDS.includes(system.id)) return;
   const next = nextToolControl(system);
   if (next && !next.disabled && next.offsetParent !== null) next.classList.add("is-next");
 }
@@ -2670,7 +2705,8 @@ function renderApp() {
 
   renderA23Editor(system);
   renderSiteEditor(system);
-  if (["A2-3", "A10_SITE"].includes(system.id)) { renderHowToUse(system); renderToolGuide(); return; }
+  renderA11Editor(system);
+  if (EMBEDDED_TOOL_IDS.includes(system.id)) { renderHowToUse(system); renderToolGuide(); return; }
   renderInputs(system);
   renderResult(system);
   renderHowToUse(system);
