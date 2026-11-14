@@ -2768,3 +2768,48 @@ body[data-theme="white"] .badge::before {
   .tool-panel .is-next, .tool-panel .is-next::after { animation: none; }
   .tool-panel .is-next { box-shadow: 0 0 0 2px var(--cyan); }
 }
+
+/* A6-3 自由選擇視角: 3D orbit preview + sliders (a6-3/camera-picker.js, a6-3/orbit-stage.js). */
+.a63-picker { display: grid; gap: 10px; }
+.a63-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.a63-head .upload-label { margin: 0; }
+.a63-reset-view { min-height: 28px; padding: 2px 10px; border: 1px solid var(--line-soft); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; }
+.a63-reset-view:hover { color: var(--text); border-color: var(--line); }
+.a63-stage { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1 / 1; margin: 0 auto; overflow: hidden; border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 42%, #33343b 0%, #222327 58%, #18181c 100%); }
+body[data-theme="silver"] .a63-stage, body[data-theme="white"] .a63-stage { background: radial-gradient(circle at 50% 42%, #ffffff 0%, #eef0f5 60%, #e2e5ec 100%); border: 1px solid var(--line-soft); }
+.a63-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: move; }
+.a63-canvas.is-dragging { cursor: grabbing !important; }
+.a63-stage-message { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 18px; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
+.a63-stage.is-unavailable { aspect-ratio: auto; min-height: 96px; }
+.a63-stage.is-unavailable .a63-legend { display: none; }
+.a63-legend { position: absolute; left: 8px; bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 0; list-style: none; color: #c9ccd8; font-size: 10px; pointer-events: none; }
+body[data-theme="silver"] .a63-legend, body[data-theme="white"] .a63-legend { color: #4c5366; }
+.a63-legend li::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; vertical-align: 0; }
+.a63-legend .is-h::before { background: #2fd3f0; } .a63-legend .is-v::before { background: #e25cf5; } .a63-legend .is-z::before { background: #ffcf1f; border-radius: 2px; }
+.a63-rows { display: grid; gap: 10px; }
+.a63-row { display: grid; gap: 6px; }
+.a63-row-line { display: grid; grid-template-columns: 64px minmax(0, 1fr) 62px 12px; align-items: center; gap: 8px; }
+.field-box .a63-row-line label { margin: 0; font-size: 12px; }
+.a63-picker input.a63-range { min-height: 0; height: 22px; padding: 0; border: 0; background: transparent; accent-color: var(--cyan); cursor: pointer; }
+.a63-row[data-row="horizontal"] .a63-range { accent-color: #2fd3f0; }
+.a63-row[data-row="vertical"] .a63-range { accent-color: #e25cf5; }
+.a63-row[data-row="zoom"] .a63-range { accent-color: #e0b100; }
+.a63-picker input.a63-number { min-height: 32px; padding: 0 6px; font-size: 13px; text-align: right; }
+.a63-unit { color: var(--muted); font-size: 12px; }
+.a63-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.a63-chip { min-height: 28px; padding: 2px 9px; border: 1px solid var(--line-soft); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; }
+.a63-chip:hover { color: var(--text); border-color: var(--line); }
+.a63-chip.is-active { color: var(--text); border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 16%, transparent); font-weight: 700; }
+.a63-row[data-row="vertical"] .a63-chip.is-active { border-color: #e25cf5; background: color-mix(in srgb, #e25cf5 16%, transparent); }
+.a63-row[data-row="zoom"] .a63-chip.is-active { border-color: #e0b100; background: color-mix(in srgb, #e0b100 18%, transparent); }
+.a63-hint { color: var(--soft); font-size: 10.5px; line-height: 1.5; }
+.a63-summary { display: grid; gap: 4px; margin: 0; padding: 9px 11px; border-radius: var(--radius); background: var(--accent-soft); color: var(--muted); font-size: 12px; }
+.a63-summary strong { color: var(--text); font-size: 13px; }
+.a63-summary code { color: var(--soft); font-size: 10.5px; overflow-wrap: anywhere; }
+.a63-note { margin: 0; color: var(--cyan); font-size: 12px; line-height: 1.6; }
+.a63-picker.is-disabled .a63-rows { opacity: .55; }
+.a63-picker :is(.a63-chip, .a63-reset-view, .a63-range, .a63-number):focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .a63-row-line { grid-template-columns: 56px minmax(0, 1fr) 56px 10px; gap: 6px; }
+}

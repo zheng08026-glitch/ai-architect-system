@@ -145,6 +145,12 @@ body[data-theme="violet"] {
    the purple fills retain their source colors in every theme. */
 body[data-theme="silver"] .artwork-pixels,
 body[data-theme="white"] .artwork-pixels { filter: var(--artwork-light-filter); }
+/* A11 has its own drawn icon: white strokes for dark themes, ink strokes for silver/white. */
+.system-icon-picture .icon-on-light { display: none; }
+body[data-theme="silver"] .system-icon-picture .icon-on-dark,
+body[data-theme="white"] .system-icon-picture .icon-on-dark { display: none; }
+body[data-theme="silver"] .system-icon-picture .icon-on-light,
+body[data-theme="white"] .system-icon-picture .icon-on-light { display: inline; }
 body[data-theme="silver"] .status-pill:not(.pending),
 body[data-theme="white"] .status-pill:not(.pending) { color: #087154; border-color: #83b8aa; background: #e3f4ed; }
 body[data-theme="silver"] .how-to-toggle,

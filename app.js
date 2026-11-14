@@ -129,6 +129,20 @@ const systems = [
     prompt: false,
   },
   {
+    id: "A6-3",
+    activeTitle: "A6-3｜Free Camera View",
+    title: "Creative Multi-View",
+    subtitle: "自由選擇視角",
+    desc: "上傳一張建築透視圖，用 3D 球體、滑桿或數值自訂水平角度、垂直角度與遠近，由 AI 產生該視角的建築圖。",
+    tier: "會員",
+    status: "Live System",
+    result: "image",
+    inputs: [{ key: "building", label: "建築透視圖（原始視角）" }],
+    count: false,
+    prompt: false,
+    cameraPicker: true,
+  },
+  {
     id: "A7-1",
     activeTitle: "A7-1｜Style PLUS",
     title: "Style PLUS",
@@ -294,7 +308,7 @@ const gridSystems = [
     id: "A6",
     targetId: "A6-1",
     title: "Creative Multi-View",
-    subtitle: "一張圖產生8視角 - 2套共16視角",
+    subtitle: "8視角×2套＋自由選擇視角",
   },
   {
     ...systems.find((system) => system.id === "A7-1"),
@@ -323,7 +337,7 @@ const sidebarGroups = [
   { id: "A3", systemId: "A3" },
   { id: "A4", systemId: "A4" },
   { id: "A5", systemId: "A5" },
-  { id: "A6", title: "Creative Multi-View", summary: "多角度透視", childIds: ["A6-1", "A6-2"] },
+  { id: "A6", title: "Creative Multi-View", summary: "多角度透視", childIds: ["A6-1", "A6-2", "A6-3"] },
   { id: "A7", title: "Style PLUS", summary: "風格融合／仿生轉化", childIds: ["A7-1", "A7-2"] },
   { id: "A8", title: "HD Enhance", summary: "提升畫質", childIds: ["A8-1", "A8-2"] },
   { id: "A9", title: "AI Motion Render", summary: "ＡＩ動畫模擬", childIds: ["A9-1", "A9-2", "A9-3"] },
@@ -1069,10 +1083,22 @@ const systemArtworkCrops = {
   A9: { box: [791, 529, 190, 90] },
   A10: { box: [1039, 532, 194, 103], clip: "1039,532 1233,532 1233,621 1189,621 1189,635 1080,635 1080,631 1039,631" },
 };
-systemArtworkCrops.A11 = systemArtworkCrops.A10;   // drawing-to-CAD family art until A11 gets its own
+// Families with their own picture (not cut from the reference sheet): one file for dark themes, one for
+// silver/white, cropped to the drawing (480 x 239). systems-ui.css shows the one that matches the theme.
+const systemIconImages = {
+  A11: { dark: "./assets/system-icons/a11-pdf-to-dxf-dark.webp", light: "./assets/system-icons/a11-pdf-to-dxf-light.webp", size: [480, 239] },
+};
 
 function systemIllustration(systemId, className) {
   const familyId = systemId.match(/^A\d+/)?.[0] || "A1";
+  const icon = systemIconImages[familyId];
+  if (icon) {
+    const [width, height] = icon.size;
+    return `<svg class="${className} system-icon-picture" viewBox="0 0 ${width} ${height}" width="200" height="120" aria-hidden="true" focusable="false">
+      <image class="icon-on-dark" href="${icon.dark}" width="${width}" height="${height}" />
+      <image class="icon-on-light" href="${icon.light}" width="${width}" height="${height}" />
+    </svg>`;
+  }
   const crop = systemArtworkCrops[familyId] || systemArtworkCrops.A1;
   const clipId = `artwork-${familyId}-${className}`;
   const filterId = `${clipId}-background`;
@@ -2005,7 +2031,8 @@ function renderHowToUse(system) {
   const guideSrc = OPERATION_GUIDES[system.id];
   const isA10 = system.id === "A10";
   const isPlus = isA2Plus(system);
-  const hasGuide = Boolean(guideSrc || isA10 || isPlus);
+  const isA63 = system.id === "A6-3";
+  const hasGuide = Boolean(guideSrc || isA10 || isPlus || isA63);
   const isVisible = Boolean(hasGuide && isHowToUseOpen);
   howToUseButton.hidden = !hasGuide;
   howToUseButton.setAttribute("aria-expanded", String(isVisible));
@@ -2038,7 +2065,15 @@ function renderHowToUse(system) {
     howToUsePopover.append(plusGuide);
   }
   if (plusGuide) plusGuide.hidden = !isPlus;
-  howToUseImage.hidden = isA10 || isPlus || !guideSrc;
+  let a63Guide = document.getElementById("a63HowToUse");
+  if (!a63Guide && isA63) {
+    a63Guide = document.createElement("div"); a63Guide.id = "a63HowToUse";
+    a63Guide.className = "a10-how-to-use";
+    a63Guide.innerHTML = '<p><strong>A6-3 自由選擇視角｜操作說明</strong></p><ol><li>上傳一張建築透視圖（完成的渲染圖效果最好）。圖片會貼在 3D 預覽方塊的正面。</li><li>在 3D 預覽中拖曳：<b>藍點</b>沿圓環調整水平角度、<b>紫點</b>沿弧線調整垂直角度、<b>黃色相機</b>前後拖曳調整遠近；拖曳空白處可旋轉預覽，雙擊恢復。</li><li>也可以拉滑桿、直接輸入數值，或按快速按鈕（正面、右前、俯視、近景⋯）。</li><li>AI 會把角度歸成 8 個方位 × 4 種高度 × 3 種遠近；亮起的按鈕與「AI 鏡頭」就是實際送出的鏡頭。只在同一格內微調，成果不會改變。</li><li>按「依選定視角產生建築圖」，每次扣 1 點 A1–A8 會員額度；同一張圖、同一個鏡頭重複送出會直接顯示先前成果，不再扣點。</li><li>完成後可下載成果 PNG，歷史成果可從會員中心重新開啟（會還原當時的角度）。</li></ol>';
+    howToUsePopover.append(a63Guide);
+  }
+  if (a63Guide) a63Guide.hidden = !isA63;
+  howToUseImage.hidden = isA10 || isPlus || isA63 || !guideSrc;
   if (!hasGuide) return;
 
   const guideTitle = `${system.displayId || system.id} How To Use / 如何使用`;
@@ -2070,6 +2105,66 @@ function a2PlusContext(system) {
   };
 }
 
+// A6-3 自由選擇視角: one picker instance survives re-renders (its host node is moved, the WebGL canvas kept).
+let a63Camera = { horizontal: 45, vertical: 0, zoom: 5 };
+let a63Picker = null;
+let a63PickerPromise = null;
+const a63PickerHost = document.createElement("div");
+a63PickerHost.className = "a63-picker-host";
+
+function a63CameraField() {
+  if (!a63PickerPromise) {
+    a63PickerHost.textContent = "正在載入視角工具…";
+    a63PickerPromise = import("./a6-3/camera-picker.js?v=20261114-a63")
+      .then((module) => {
+        a63Picker = module.mountCameraPicker(a63PickerHost, {
+          value: a63Camera,
+          onChange: (value) => { a63Camera = value; a63Picker?.setNote(""); },
+        });
+        return a63Picker;
+      })
+      .catch(() => {
+        a63PickerHost.innerHTML = '<p class="generation-notice">視角工具載入失敗，請重新整理頁面後再試。</p>';
+        a63PickerPromise = null;
+        return null;
+      });
+  }
+  a63PickerPromise.then((picker) => picker?.setImage(previews.get("A6-3-building") || ""));
+  return a63PickerHost;
+}
+
+async function submitA63(system) {
+  const file = uploadedFiles.get("A6-3-building");
+  if (!file) throw new Error("請先上傳：建築透視圖（原始視角）");
+  const apiBase = getApiBase();
+  const config = await fetch(`${apiBase}/api/a6-3/config`).then((response) => (response.ok ? response.json() : null)).catch(() => null);
+  if (!config) throw new Error("A6-3 服務暫時無法回應，請稍後再試。");
+  if (!config.enabled) throw new Error("A6-3 自由選擇視角尚未開放，請稍後再試。");
+  if (config.max_upload_bytes && file.size > config.max_upload_bytes) throw new Error("圖片超過 25 MB，請縮小後再上傳。");
+
+  const camera = a63Picker?.getValue() || a63Camera;
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("horizontal_angle", String(camera.horizontal));
+  formData.append("vertical_angle", String(camera.vertical));
+  formData.append("zoom", String(camera.zoom));
+  const response = await fetch(`${apiBase}/api/a6-3/jobs`, { method: "POST", headers: getAuthHeaders(), body: formData });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "任務送出失敗");
+
+  a63Picker?.setNote(data.reused
+    ? "此圖片在這個視角已經產生過，直接顯示先前成果，未再扣點數。"
+    : !config.workers_online ? "目前 A6-3 主機忙碌或離線，任務已排隊，主機上線後會自動處理。" : "");
+  renderJobProgress(system, { stage: "analyzing", stage_label: "分析使用者提供資訊", progress_percent: 8 });
+  a63Picker?.setDisabled(true);
+  try {
+    await pollJob(data.job_id, system);
+  } finally {
+    a63Picker?.setDisabled(false);
+  }
+  await loadMemberCenter();
+}
+
 function renderInputs(system) {
   if (isA2Plus(system)) {
     a2Plus.renderInputs(system.id, inputStack, uploadField(system.inputs[0]),
@@ -2090,6 +2185,7 @@ function renderInputs(system) {
   if (system.prompt) inputStack.append(textPromptField(system));
   if (system.transitionPrompts) inputStack.append(transitionPromptFields(system));
   if (system.count) inputStack.append(countField());
+  if (system.cameraPicker) inputStack.append(a63CameraField());
 
   const generateButton = document.createElement("button");
   generateButton.className = "generate-button";
@@ -2101,6 +2197,8 @@ function renderInputs(system) {
         ? "AI製作影片"
         : MULTI_IMAGE_ZIP_SYSTEM_IDS.has(system.id)
           ? "生成 8 個建築視角"
+        : system.cameraPicker
+          ? "依選定視角產生建築圖"
         : "產生建築圖";
   generateButton.addEventListener("click", submitOrSimulateGenerate);
   inputStack.append(generateButton);
@@ -2450,6 +2548,10 @@ function openJobResult(index) {
   const system = systems.find((item) => item.id === job.system_id) || getActiveSystem();
   if (activeId === "A9-3" && system.id !== activeId) a93PresetLoadVersion += 1;
   activeId = system.id;
+  if (system.id === "A6-3" && job.camera) {
+    a63Camera = { horizontal: job.camera.horizontal_angle, vertical: job.camera.vertical_angle, zoom: job.camera.zoom };
+    a63Picker?.setValue(a63Camera);
+  }
   renderApp();
 
   if (system.id === "A2-3") {
@@ -2593,6 +2695,7 @@ async function submitRealJob(system) {
 
   const validationError = validateInputs(system);
   if (validationError) throw new Error(validationError);
+  if (system.id === "A6-3") return submitA63(system);
 
   const formData = new FormData();
   formData.append("system_id", system.id);
