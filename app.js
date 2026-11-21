@@ -1978,7 +1978,7 @@ async function loadTransitionPresetFiles(system, imageSources) {
   );
 }
 
-// A9-1 center-crops the upload to the chosen canvas on the GPU worker, so it can offer portrait canvases.
+// Every A9 workflow center-crops its images to the chosen canvas on the GPU worker, so all offer portrait canvases.
 function videoRatioOption([w, h], checked) {
   const longest = Math.max(w, h);
   const iconWidth = Math.round((22 * w) / longest);
@@ -1993,7 +1993,7 @@ function videoRatioOption([w, h], checked) {
 
 function videoOutputFields(system) {
   const isA91 = system.id === "A9-1";
-  const ratios = isA91 ? [[1, 1], [4, 3], [16, 9], [3, 4], [9, 16]] : [[1, 1], [4, 3], [16, 9]];
+  const ratios = [[1, 1], [4, 3], [16, 9], [3, 4], [9, 16]];
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
   wrapper.innerHTML = `
@@ -2019,7 +2019,7 @@ function videoOutputFields(system) {
       <option value="15" disabled>15秒（暫不開放）</option>
     </select>
     ` : ""}
-    <small>預設為 1:1／低品質。中品質需要較多運算時間。${isA91 ? "圖片比例與影片尺寸不同時，會置中裁切成滿版。" : ""}</small>
+    <small>預設為 1:1／低品質。中品質需要較多運算時間。圖片比例與影片尺寸不同時，會置中裁切成滿版。</small>
   `;
   return wrapper;
 }
