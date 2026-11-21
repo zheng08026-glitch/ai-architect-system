@@ -2813,3 +2813,14 @@ body[data-theme="silver"] .a63-legend, body[data-theme="white"] .a63-legend { co
 @media (max-width: 520px) {
   .a63-row-line { grid-template-columns: 56px minmax(0, 1fr) 56px 10px; gap: 6px; }
 }
+
+/* A9 video size picker: radio chips with a shape icon after each ratio */
+.video-ratio-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.field-box .video-ratio-group .video-ratio-option { display: inline-flex; align-items: center; position: relative; gap: 7px; min-height: 36px; margin: 0; padding: 4px 11px; border: 1px solid var(--line-soft); border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
+.video-ratio-option input { position: absolute; opacity: 0; pointer-events: none; }
+.video-ratio-icon { display: inline-block; flex: none; border: 1.5px solid currentColor; border-radius: 2px; }
+.field-box .video-ratio-group .video-ratio-option:hover { color: var(--text); border-color: var(--line); }
+.field-box .video-ratio-group .video-ratio-option:has(input:checked) { color: var(--text); border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 16%, transparent); }
+.video-ratio-option:has(input:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 2px; }
+body[data-theme="silver"] .field-box .video-ratio-group .video-ratio-option:has(input:checked),
+body[data-theme="white"] .field-box .video-ratio-group .video-ratio-option:has(input:checked) { color: #1c2335; }

@@ -1978,17 +1978,29 @@ async function loadTransitionPresetFiles(system, imageSources) {
   );
 }
 
+// A9-1 center-crops the upload to the chosen canvas on the GPU worker, so it can offer portrait canvases.
+function videoRatioOption([w, h], checked) {
+  const longest = Math.max(w, h);
+  const iconWidth = Math.round((22 * w) / longest);
+  const iconHeight = Math.round((22 * h) / longest);
+  return `
+      <label class="video-ratio-option">
+        <input type="radio" name="videoAspectRatio" value="${w}:${h}"${checked ? " checked" : ""} />
+        <span>${w}:${h}</span>
+        <i class="video-ratio-icon" style="width:${iconWidth}px;height:${iconHeight}px" aria-hidden="true"></i>
+      </label>`;
+}
+
 function videoOutputFields(system) {
   const isA91 = system.id === "A9-1";
+  const ratios = isA91 ? [[1, 1], [4, 3], [16, 9], [3, 4], [9, 16]] : [[1, 1], [4, 3], [16, 9]];
   const wrapper = document.createElement("div");
   wrapper.className = "field-box";
   wrapper.innerHTML = `
-    <label for="videoAspectRatio">影片尺寸</label>
-    <select id="videoAspectRatio">
-      <option value="1:1">1:1</option>
-      <option value="4:3">4:3</option>
-      <option value="16:9">16:9</option>
-    </select>
+    <label id="videoAspectRatioLabel">影片尺寸</label>
+    <div class="video-ratio-group" id="videoAspectRatio" role="radiogroup" aria-labelledby="videoAspectRatioLabel">
+      ${ratios.map((ratio, index) => videoRatioOption(ratio, index === 0)).join("")}
+    </div>
     <label for="videoMegapixels">影片品質</label>
     <select id="videoMegapixels">
       ${isA91 ? `
@@ -2007,7 +2019,7 @@ function videoOutputFields(system) {
       <option value="15" disabled>15秒（暫不開放）</option>
     </select>
     ` : ""}
-    <small>預設為 1:1／低品質。中品質需要較多運算時間。</small>
+    <small>預設為 1:1／低品質。中品質需要較多運算時間。${isA91 ? "圖片比例與影片尺寸不同時，會置中裁切成滿版。" : ""}</small>
   `;
   return wrapper;
 }
@@ -2703,7 +2715,7 @@ async function submitRealJob(system) {
   formData.append("count", ($("#outputCount")?.value || "1").trim().startsWith("6") ? "6" : "1");
   formData.append("client_id", getClientId());
   if (["A9-1", "A9-2", "A9-3"].includes(system.id)) {
-    formData.append("video_aspect_ratio", $("#videoAspectRatio")?.value || "1:1");
+    formData.append("video_aspect_ratio", $('input[name="videoAspectRatio"]:checked')?.value || "1:1");
     formData.append("video_megapixels", $("#videoMegapixels")?.value || "0.3");
     if (system.id === "A9-1") formData.append("video_duration", $("#videoDuration")?.value || "10");
   }
