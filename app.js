@@ -352,6 +352,42 @@ systems.push({id:"A11_1",status:"Live System",tier:"會員",result:"dxf",inputs:
 gridSystems.push({...systems.find((system) => system.id === "A11_1"), targetId:"A11_1", gridDisplayId:"A11", title:"PDF TO DXF", subtitle:"PDF(向量格式) 2 DXF"});
 sidebarGroups.push({id:"A11",systemId:"A11_1"});
 const EMBEDDED_TOOL_IDS = ["A2-3", "A10_SITE", "A11_1"];
+// A11 is free, but its jobs still appear in 會員中心 → 近期任務 so members can download again later.
+const A11_RECORD_FILES = [
+  {kind: "dxf", label: "下載 DXF", suffix: ".dxf"},
+  {kind: "preview", label: "預覽圖", suffix: "_preview.png"},
+  {kind: "dimensions", label: "尺寸核對表", suffix: "_dimensions.csv"},
+  {kind: "report", label: "轉換報告", suffix: "_report.json"},
+];
+async function downloadA11RecordFile(job, kind, button) {
+  const item = A11_RECORD_FILES.find(file => file.kind === kind);
+  if (!job?.job_id || !item) return;
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = "下載中…";
+  try {
+    const response = await fetch(`${getApiBase()}/api/a11/jobs/${encodeURIComponent(job.job_id)}/files/${kind}`, {
+      headers: getAuthHeaders(), cache: "no-store",
+    });
+    if (response.status === 401) throw new Error("登入驗證已過期，請重新登入後下載。");
+    if (!response.ok) throw new Error("下載失敗，請稍後再試。");
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("下載檔案內容是空的，請稍後再試。");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = (job.source_name || "drawing") + item.suffix;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    window.alert(error.message || "下載失敗，請稍後再試。");
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
 
 if (a2PlusEntryEnabled && a2Plus) sidebarGroups.find(group => group.id === "A2").childIds = ["A2-1", "A2-1-PLUS", "A2-1-PLUS-PRECISE", "A2-2", "A2-2-PLUS"];
 if (a23EntryEnabled) sidebarGroups.find(group => group.id === "A2").childIds.push("A2-3");
@@ -812,12 +848,18 @@ function renderJobList(records = []) {
         job.status === "completed" && (imageUrls.length || videoUrls.length || job.output_text || job.output_files?.length);
       const downloadUrl = imageUrls[0] || "";
       const errorMessage = getPublicJobError(job);
+      const isA11 = job.system_id === "A11_PDF2DXF";
+      const a11Buttons = isA11 && job.status === "completed"
+        ? A11_RECORD_FILES.filter(item => (job.a11_files || []).includes(item.kind))
+          .map(item => `<button type="button" class="text-button" data-a11-download="${index}" data-a11-kind="${item.kind}">${item.label}</button>`).join("")
+        : "";
       return `
         <div class="record-item" data-job-index="${index}" ${index >= 10 ? "hidden" : ""}>
-          <strong>${escapeHtml(a2Plus?.presets[job.system_id]?.label || job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
-          <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}</small>
+          <strong>${escapeHtml(isA11 ? "A11-1 PDF 轉 DXF（免費）" : a2Plus?.presets[job.system_id]?.label || job.system_id || "AI")} · ${escapeHtml(job.status || "pending")}</strong>
+          <small>${escapeHtml(formatJobTime(job.completed_at || job.failed_at || job.created_at) || job.job_id || "")}${isA11 && job.source_name ? ` · ${escapeHtml(job.source_name)}.pdf` : ""}</small>
           ${errorMessage ? `<small>${escapeHtml(errorMessage)}</small>` : ""}
           <div class="record-actions">
+            ${a11Buttons}
             ${
               (hasResult && (job.system_id !== "A2-3" || a23EntryEnabled)) || (["A10","A10_V1", ...(a23EntryEnabled ? ["A2-3"] : [])].includes(job.system_id) && ["pending", "processing", "finalizing"].includes(job.status))
                 ? `<button type="button" class="text-button" data-open-job="${index}">${hasResult ? "查看成果" : "查看進度"}</button>`
@@ -3480,6 +3522,11 @@ profileForm?.addEventListener("submit", saveProfile);
 bindMemberRecordPages(usagePages, usageList);
 bindMemberRecordPages(jobPages, jobList);
 jobList?.addEventListener("click", (event) => {
+  const a11Button = event.target.closest("[data-a11-download]");
+  if (a11Button) {
+    void downloadA11RecordFile(memberJobs[Number(a11Button.dataset.a11Download)], a11Button.dataset.a11Kind, a11Button);
+    return;
+  }
   const button = event.target.closest("[data-open-job]");
   if (!button) return;
   openJobResult(Number(button.dataset.openJob));
